@@ -18,6 +18,8 @@ The pet appears, connects itself and asks your name. Restart Claude Code once. N
 
 **Updates are automatic.** The pet checks for new versions, downloads them and updates itself quietly when you're idle.
 
+**Starts by itself:** with Windows, after every update, and whenever you use Claude Code. To restart it manually, right-click the pet → **Restart pet 🔄** (or Quit, then open "Giggles Pet" from the desktop / Start menu).
+
 Uninstall from Windows "Installed apps".
 
 ## What it does

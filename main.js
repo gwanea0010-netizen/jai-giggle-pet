@@ -441,6 +441,9 @@ function handleHookEvent(evt) {
     case 'settings':
       openSettings();
       break;
+    case 'restart':
+      restartPet();
+      break;
     default:
       // manual / test states (scripts/send.js)
       if (['done', 'working', 'attention', 'hello', 'sleep', 'snack', 'dance', 'joke', 'tip', 'quote', 'codetest', 'music', 'call', 'preview', 'festival'].includes(name)) {
@@ -864,10 +867,22 @@ ipcMain.on('context-menu', () => {
     { label: 'Walk around', type: 'checkbox', checked: settings.roam, click: (i) => updateSettings({ roam: i.checked }) },
     { label: 'React to music & calls', type: 'checkbox', checked: settings.media, click: (i) => updateSettings({ media: i.checked }) },
     { type: 'separator' },
+    { label: 'Restart pet 🔄', click: restartPet },
     { label: `Quit ${settings.petName}`, click: () => app.quit() },
   ]);
   menu.popup({ window: win });
 });
+
+// Relaunch with the same exe + args (installed app and source checkout alike).
+// Release the single-instance lock first so the new process doesn't think we're still running.
+function restartPet() {
+  app.isQuitting = true;
+  stopMonitor();
+  saveSettings(true);
+  app.releaseSingleInstanceLock();
+  app.relaunch();
+  app.exit(0);
+}
 
 // ---------- app lifecycle ----------
 app.on('second-instance', () => broadcast('pet-event', { state: 'hello' }));
