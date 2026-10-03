@@ -431,7 +431,7 @@ function handleHookEvent(evt) {
       break;
     default:
       // manual / test states (scripts/send.js)
-      if (['done', 'working', 'attention', 'hello', 'sleep', 'snack', 'dance', 'joke', 'tip', 'music', 'call', 'preview', 'festival'].includes(name)) {
+      if (['done', 'working', 'attention', 'hello', 'sleep', 'snack', 'dance', 'joke', 'tip', 'quote', 'music', 'call', 'preview', 'festival'].includes(name)) {
         broadcast('pet-event', { state: name, project, session, detail: evt.detail, sub: evt.sub });
       }
   }
@@ -553,6 +553,94 @@ ipcMain.on('walk', (_e, dx) => {
 });
 ipcMain.on('walk-stop', stopWalk);
 
+// ---------- slingshot flight (across all monitors) ----------
+let flyTimer = null;
+
+// The work area under x (stacked monitors: the one at this height, else the next one down).
+function areaAt(areas, x, y) {
+  const col = areas.filter((a) => x >= a.x && x < a.x + a.width);
+  if (!col.length) {
+    // in a gap between monitors: use the horizontally nearest one
+    return areas.reduce((best, a) => {
+      const d = Math.min(Math.abs(x - a.x), Math.abs(x - (a.x + a.width)));
+      return !best || d < best.d ? { a, d } : best;
+    }, null).a;
+  }
+  return col.find((a) => y >= a.y && y < a.y + a.height)
+    || col.filter((a) => a.y >= y).sort((p, q) => p.y - q.y)[0]
+    || col[col.length - 1];
+}
+
+ipcMain.on('fling', (_e, { vx, vy }) => {
+  if (!win) return;
+  stopWalk();
+  clearInterval(flyTimer);
+  win.setIgnoreMouseEvents(true, { forward: true });
+
+  const areas = screen.getAllDisplays().map((d) => d.workArea);
+  const [w, h] = win.getSize();
+  const minX = Math.min(...areas.map((a) => a.x)) - w * 0.2;
+  const maxX = Math.max(...areas.map((a) => a.x + a.width)) - w * 0.8;
+  const minY = Math.min(...areas.map((a) => a.y)) - h * 0.35;
+  const G = 1.1;
+  let [x, y] = win.getPosition();
+  vx = Math.max(-80, Math.min(80, Number(vx) || 0));
+  vy = Math.max(-80, Math.min(80, Number(vy) || 0));
+  const startArea = areaAt(areas, x + w / 2, y + h / 2);
+  let bounces = 0;
+  let frames = 0;
+
+  flyTimer = setInterval(() => {
+    frames++;
+    vy += G;
+    x += vx;
+    y += vy;
+
+    if (x < minX) { x = minX; vx = -vx * 0.6; bounces++; broadcast('fly-bounce'); }
+    if (x > maxX) { x = maxX; vx = -vx * 0.6; bounces++; broadcast('fly-bounce'); }
+    if (y < minY) { y = minY; vy = Math.abs(vy) * 0.4; }
+
+    const area = areaAt(areas, x + w / 2, y + h * 0.5);
+    const floor = area.y + area.height - h;
+    let grounded = false;
+    if (y >= floor) {
+      y = floor;
+      if (vy > 7) {
+        vy = -vy * 0.5;
+        bounces++;
+        broadcast('fly-bounce');
+      } else {
+        vy = 0;
+        grounded = true;
+      }
+      vx *= 0.82; // ground friction
+    }
+
+    win.setPosition(Math.round(x), Math.round(y));
+
+    if ((grounded && Math.abs(vx) < 0.6) || frames > 900) {
+      clearInterval(flyTimer);
+      flyTimer = null;
+      // Settle exactly on the landing monitor's floor, fully on screen
+      // (monitors with different scaling can leave the pet floating otherwise).
+      // Crossing monitors with different scaling also distorts the window size, so restore it too.
+      const b = win.getBounds();
+      const wa = screen.getDisplayMatching(b).workArea;
+      const size = petSize(settings.scale);
+      const target = {
+        x: Math.round(Math.min(Math.max(b.x, wa.x), wa.x + wa.width - size.w)),
+        y: Math.round(wa.y + wa.height - size.h),
+        width: size.w,
+        height: size.h,
+      };
+      win.setBounds(target);
+      win.setBounds(target); // second pass: Windows applies the new monitor's DPI after the first move
+      savePosition();
+      broadcast('fly-done', { bounces, crossed: area !== startArea && areas.length > 1 });
+    }
+  }, 16);
+});
+
 // ---------- IPC ----------
 ipcMain.on('set-ignore-mouse', (_e, ignore) => {
   if (win) win.setIgnoreMouseEvents(ignore, { forward: true });
@@ -560,6 +648,12 @@ ipcMain.on('set-ignore-mouse', (_e, ignore) => {
 
 ipcMain.on('move-by', (_e, { dx, dy }) => {
   if (!win) return;
+  if (flyTimer) {
+    // caught mid-air
+    clearInterval(flyTimer);
+    flyTimer = null;
+    broadcast('fly-done', {});
+  }
   const [x, y] = win.getPosition();
   win.setPosition(Math.round(x + dx), Math.round(y + dy));
 });
@@ -695,6 +789,7 @@ ipcMain.on('context-menu', () => {
         { label: 'Dance party 💃', click: trigger('dance') },
         { label: 'Tell me a joke 😂', click: trigger('joke') },
         { label: 'Give me a tip 💡', click: trigger('tip') },
+        { label: 'Motivate me 💪', click: trigger('quote') },
         { label: 'Celebrate 🎉', click: trigger('done') },
         { label: 'Nap time 😴', click: trigger('sleep') },
       ],

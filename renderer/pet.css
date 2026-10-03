@@ -277,6 +277,24 @@
 
 .s-dizzy .p-body-group { animation: wobble .45s ease-in-out infinite alternate; }
 
+/* slingshot */
+.s-aim .p-body-group { animation: tremble .08s linear infinite alternate; }
+.s-aim .p-arm-l { transform: rotate(-35deg); }
+.s-aim .p-arm-r { transform: rotate(35deg); }
+.pet.s-fly { animation: spin .55s linear infinite; }
+.s-fly .p-arm-l { animation: cheerL .2s ease-in-out infinite alternate; }
+.s-fly .p-arm-r { animation: cheerR .2s ease-in-out -.1s infinite alternate; }
+.s-fly .p-shadow { opacity: 0; }
+.s-land .p-body-group { animation: landSquash .55s cubic-bezier(.3, 1.6, .5, 1); }
+.s-land .p-spark { animation: twinkle .9s ease-in-out var(--d) 2; }
+@keyframes tremble { from { transform: scale(1.05, .95) translateX(-.6px); } to { transform: scale(1.05, .95) translateX(.6px); } }
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes landSquash {
+  0% { transform: scale(1.25, .7); }
+  45% { transform: scale(.9, 1.12); }
+  100% { transform: scale(1, 1); }
+}
+
 .pet.hearts .p-heart { animation: heartUp 1.6s ease-out var(--d) forwards; }
 
 /* ---------- Keyframes ---------- */

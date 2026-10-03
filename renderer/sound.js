@@ -160,8 +160,45 @@ window.Sfx = (() => {
     bass.forEach((f, i) => tone(c, t + i * 0.54, f, 0.45, 0.22, 'sine'));
   }
 
+  // "Wheee!": a voice-ish slide up then down.
+  function whee() {
+    const c = ac();
+    const t = c.currentTime + 0.02;
+    const o = c.createOscillator();
+    o.type = 'sawtooth';
+    o.frequency.setValueAtTime(500, t);
+    o.frequency.exponentialRampToValueAtTime(1300, t + 0.35);
+    o.frequency.exponentialRampToValueAtTime(700, t + 0.9);
+    const bp = c.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.frequency.value = 1800;
+    bp.Q.value = 1.8;
+    o.connect(bp).connect(envGain(c, t, 0.35, 0.05, 0.95)).connect(master);
+    o.start(t);
+    o.stop(t + 1);
+  }
+
+  // Cartoon spring bounce.
+  function boing() {
+    const c = ac();
+    const t = c.currentTime + 0.01;
+    const o = c.createOscillator();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(180, t);
+    o.frequency.exponentialRampToValueAtTime(520, t + 0.08);
+    o.frequency.exponentialRampToValueAtTime(220, t + 0.3);
+    const lfo = c.createOscillator();
+    lfo.frequency.value = 28;
+    const depth = c.createGain();
+    depth.gain.value = 40;
+    lfo.connect(depth).connect(o.frequency);
+    o.connect(envGain(c, t, 0.4, 0.005, 0.35)).connect(master);
+    o.start(t); lfo.start(t);
+    o.stop(t + 0.4); lfo.stop(t + 0.4);
+  }
+
   return {
-    giggle, chime, ping, pop, chomp, purr, tune,
+    giggle, chime, ping, pop, chomp, purr, tune, whee, boing,
     setVolume: (v) => {
       volume = v;
       if (master) master.gain.value = v * 0.65;

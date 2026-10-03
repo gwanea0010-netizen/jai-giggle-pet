@@ -46,6 +46,32 @@
       '🔺 Cyborg ERP tip: small commits, clear messages',
       '🪑 Sit up straight! Your back says thanks',
     ],
+    quotes: () => [
+      'First, solve the problem. Then, write the code. — John Johnson',
+      'Make it work, make it right, make it fast. — Kent Beck',
+      'Talk is cheap. Show me the code. — Linus Torvalds',
+      'Simplicity is the soul of efficiency. — Austin Freeman',
+      'Code is like humor. When you have to explain it, it’s bad. — Cory House',
+      'Fix the cause, not the symptom. — Steve Maguire',
+      'Experience is the name everyone gives to their mistakes. — Oscar Wilde',
+      'The best error message is the one that never shows up. — Thomas Fuchs',
+      'It always seems impossible until it’s done. — Nelson Mandela',
+      'Done is better than perfect. 🚀',
+      'Every expert was once a beginner. Keep shipping! 🌱',
+      'Small commits, big wins. 💪',
+      'A bug is just a feature you haven’t understood yet. 🐛',
+      `Bug aaj nahi to kal fix hoga. Ruk mat, ${owner()}! 💪`,
+      `Aaj ka code, kal ka product. Chalo ${owner()}! 🔺`,
+      `Thoda aur, ${owner()}. Tu kar lega! 🔥`,
+      'Coffee ☕ + Code = Magic ✨',
+      'Progress, not perfection. 📈',
+      'Read the error message. It’s trying to help! 👀',
+      'Great software is built one tiny step at a time. 🧱',
+      `You’ve solved harder bugs than this, ${owner()}. 💡`,
+      'Stay curious. Ship often. Learn always. 🚀',
+      'Clean code always looks like it was written by someone who cares. — Robert C. Martin',
+      'Deleted code is debugged code. — Jeff Sickel',
+    ],
     jokes: [
       'Why do programmers prefer dark mode? Because light attracts bugs 🐛',
       "A SQL query walks into a bar, sees two tables and asks: 'Can I JOIN you?' 🍻",
@@ -284,7 +310,15 @@
   }
 
   function showTip() {
+    // Alternate between wellness/coding tips and a little motivation.
+    if (Math.random() < 0.5) return showQuote();
     showBubble(pick(L.tips()), { sub: `💡 ${S.petName}'s tip`, cls: 'tip long', ms: 7000 });
+  }
+
+  function showQuote(sub) {
+    const q = pick(L.quotes());
+    if (state === 'idle' || state === 'music' || state === 'land') setLook('happy', 'smile');
+    showBubble(q, { sub: sub || `💪 Motivation for ${owner()}`, cls: 'tip long', ms: 4000 + q.length * 45 });
   }
 
   function hearts() {
@@ -375,7 +409,7 @@
     switch (ev) {
       case 'working':
         workingSessions.set(session, Date.now());
-        if (['done', 'tickle', 'hello', 'eat', 'dance', 'dizzy'].includes(state)) {
+        if (['done', 'tickle', 'hello', 'eat', 'dance', 'dizzy', 'aim', 'fly', 'land'].includes(state)) {
           if (detail) workDetail = detail;
         } else {
           goWorking(detail);
@@ -395,6 +429,7 @@
       case 'snack': goSnack(); break;
       case 'dance': goDance(); break;
       case 'joke': tellJoke(); break;
+      case 'quote': showQuote(); break;
       case 'tip': showTip(); break;
       case 'preview': previewItem(detail); break;
       case 'unlock': setTimeout(() => goUnlock(detail), 4800); break; // after the "done" party
@@ -508,6 +543,7 @@
     const r = wrap.getBoundingClientRect();
     const nx = clamp((clientX - (r.left + r.width / 2)) / (r.width * 0.9), -1, 1);
     const ny = clamp((clientY - (r.top + r.height * 0.55)) / (r.height * 0.9), -1, 1);
+    if (aim || state === 'fly') return;
     if (state !== 'walk') setTilt(nx, ny);
     if (pet.dataset.eyes !== 'open' || state === 'working' || state === 'eat') return;
     lookAt(nx * 4.5, ny * 4);
@@ -593,7 +629,7 @@
 
   document.addEventListener('mousemove', (e) => {
     const over = !!e.target.closest('.p-hit, #bubble.show');
-    setInteractive(over || dragging);
+    setInteractive(over || dragging || !!aim);
     trackCursor(e.clientX, e.clientY);
     if (over !== hovering) {
       hovering = over;
@@ -621,7 +657,7 @@
   });
 
   document.addEventListener('mouseleave', () => {
-    if (dragging) return;
+    if (dragging || aim) return;
     hovering = false;
     setInteractive(false);
     setTilt(0, 0);
@@ -646,14 +682,147 @@
     }, 1600);
   }
 
+  // ---------- slingshot: hold still ~0.5s, pull back, let go ----------
+  const sling = document.getElementById('sling');
+  const sctx = sling.getContext('2d');
+  const HOLD_MS = 450;
+  const MAX_PULL = 170;
+  const POWER = 0.3; // px of pull -> px/frame launch speed
+  const VIS = 0.28; // how far the pet visibly stretches inside its window
+  let holdTimer = null;
+  let aim = null; // { ax, ay, px, py }
+
+  function sizeSling() {
+    sling.width = window.innerWidth * devicePixelRatio;
+    sling.height = window.innerHeight * devicePixelRatio;
+    sctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+  }
+  window.addEventListener('resize', sizeSling);
+  sizeSling();
+
+  function startAim() {
+    if (!down || dragging) return;
+    aim = { ax: down.x, ay: down.y, px: 0, py: 0 };
+    setState('aim');
+    setLook('open', 'o');
+    setTilt(0, 0);
+    lookAt(0, 0);
+    showBubble('🎯 Pull back & let go!', { ms: 2500 });
+    play('pop');
+    drawSling();
+  }
+
+  function updateAim(e) {
+    let px = e.screenX - aim.ax;
+    let py = e.screenY - aim.ay;
+    const d = Math.hypot(px, py);
+    if (d > MAX_PULL) { px *= MAX_PULL / d; py *= MAX_PULL / d; }
+    aim.px = px;
+    aim.py = py;
+    const k = Math.hypot(px, py) / MAX_PULL;
+    wrap.style.transform = `translate(${px * VIS}px, ${py * VIS}px) rotate(${px * 0.08}deg) scale(${1 + k * 0.06}, ${1 - k * 0.08})`;
+    lookAt((-px / MAX_PULL) * 4.5, (-py / MAX_PULL) * 4); // eyes on the target
+    if (k > 0.85) setLook('open', 'grin');
+    drawSling();
+  }
+
+  function drawSling() {
+    const W = window.innerWidth;
+    const H = window.innerHeight;
+    sctx.clearRect(0, 0, W, H);
+    if (!aim) return;
+    const s = S.scale;
+    const cx = W / 2;
+    const stemTop = H - 45 * s;
+    const tipL = { x: cx - 78 * s, y: H - 100 * s };
+    const tipR = { x: cx + 78 * s, y: H - 100 * s };
+    const pet = { x: cx + aim.px * VIS, y: H - 100 * s + aim.py * VIS };
+    const k = Math.hypot(aim.px, aim.py) / MAX_PULL;
+
+    // wooden fork
+    sctx.lineCap = 'round';
+    sctx.lineJoin = 'round';
+    sctx.strokeStyle = '#7a4a24';
+    sctx.lineWidth = 10 * s;
+    sctx.beginPath();
+    sctx.moveTo(cx, H - 2);
+    sctx.lineTo(cx, stemTop);
+    sctx.lineTo(tipL.x, tipL.y);
+    sctx.moveTo(cx, stemTop);
+    sctx.lineTo(tipR.x, tipR.y);
+    sctx.stroke();
+
+    // rubber bands get thinner and redder as they stretch
+    sctx.strokeStyle = `rgb(${90 + k * 140}, ${40 + (1 - k) * 30}, 40)`;
+    sctx.lineWidth = (6 - k * 3) * s;
+    sctx.beginPath();
+    sctx.moveTo(tipL.x, tipL.y);
+    sctx.lineTo(pet.x, pet.y);
+    sctx.lineTo(tipR.x, tipR.y);
+    sctx.stroke();
+
+    // trajectory preview (scaled down to fit the window)
+    if (k > 0.12) {
+      let x = pet.x;
+      let y = pet.y;
+      let vx = -aim.px * POWER;
+      let vy = -aim.py * POWER;
+      for (let i = 1; i <= 14; i++) {
+        for (let j = 0; j < 3; j++) { vy += 1.1; x += vx * 0.07; y += vy * 0.07; }
+        sctx.globalAlpha = 1 - i / 16;
+        sctx.fillStyle = '#ffd23f';
+        sctx.beginPath();
+        sctx.arc(x, y, (3.2 - i * 0.12) * s + 1, 0, Math.PI * 2);
+        sctx.fill();
+      }
+      sctx.globalAlpha = 1;
+    }
+  }
+
+  function releaseAim() {
+    const { px, py } = aim;
+    aim = null;
+    drawSling();
+    wrap.style.transform = '';
+    if (Math.hypot(px, py) < 25) return settle(); // barely pulled: cancel
+    lastActivity = Date.now();
+    setState('fly');
+    setLook('happy', 'grin');
+    hideBubble();
+    play('whee');
+    window.pet.fling(-px * POWER, -py * POWER);
+  }
+
+  window.pet.onFlyBounce(() => {
+    play('boing');
+    setLook('dizzy', 'o');
+    setTimeout(() => state === 'fly' && setLook('happy', 'grin'), 250);
+  });
+
+  window.pet.onFlyDone(({ bounces = 0, crossed = false } = {}) => {
+    if (state !== 'fly') return;
+    setState('land');
+    setLook(bounces >= 3 ? 'dizzy' : 'happy', 'grin');
+    play('chomp');
+    setTimeout(() => {
+      if (state !== 'land') return;
+      showQuote(crossed ? '🖥️ Wheee, new screen!' : bounces >= 3 ? '😵 Boing boing… I’m okay!' : '🚀 Wheee! That was fun');
+    }, 700);
+    after(7000, settle);
+  });
+
   hit.addEventListener('pointerdown', (e) => {
     if (e.button !== 0) return;
     hit.setPointerCapture(e.pointerId);
     down = { x: e.screenX, y: e.screenY, lx: e.screenX, ly: e.screenY };
+    clearTimeout(holdTimer);
+    if (state !== 'fly') holdTimer = setTimeout(startAim, HOLD_MS);
   });
   hit.addEventListener('pointermove', (e) => {
     if (!down) return;
+    if (aim) return updateAim(e);
     if (!dragging && Math.hypot(e.screenX - down.x, e.screenY - down.y) > 4) {
+      clearTimeout(holdTimer);
       dragging = true;
       wrap.classList.add('dragging');
       if (state === 'walk') goIdle();
@@ -666,7 +835,13 @@
   });
   hit.addEventListener('pointerup', (e) => {
     if (!down) return;
+    clearTimeout(holdTimer);
     hit.releasePointerCapture(e.pointerId);
+    if (aim) {
+      down = null;
+      return releaseAim();
+    }
+    if (state === 'fly') { down = null; return; }
     const wasDrag = dragging;
     down = null;
     dragging = false;
@@ -680,6 +855,19 @@
     else if (state === 'attention') { hideBubble(); settle(); }
     else if (clicks.length >= 6) { clicks = []; goDizzy(); }
     else tickle();
+  });
+  // If the OS takes the mouse away mid-gesture (alt-tab, lock screen…), finish it cleanly.
+  hit.addEventListener('lostpointercapture', () => {
+    clearTimeout(holdTimer);
+    if (aim) {
+      down = null;
+      releaseAim();
+    } else if (dragging) {
+      down = null;
+      dragging = false;
+      wrap.classList.remove('dragging');
+      window.pet.dragEnd();
+    }
   });
   hit.addEventListener('dblclick', () => goDone(lastProject));
   hit.addEventListener('contextmenu', (e) => {

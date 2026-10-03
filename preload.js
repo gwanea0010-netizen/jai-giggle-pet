@@ -13,6 +13,9 @@ contextBridge.exposeInMainWorld('pet', {
   dragEnd: () => ipcRenderer.send('drag-end'),
   walk: (dx) => ipcRenderer.send('walk', dx),
   walkStop: () => ipcRenderer.send('walk-stop'),
+  fling: (vx, vy) => ipcRenderer.send('fling', { vx, vy }),
+  onFlyBounce: on('fly-bounce'),
+  onFlyDone: on('fly-done'),
   contextMenu: () => ipcRenderer.send('context-menu'),
 
   // shared / settings window

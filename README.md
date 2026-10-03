@@ -35,7 +35,9 @@ Uninstall from Windows "Installed apps".
 
 **Interactions:** click = tickle 😆 · rub back and forth = pat 💕 · click 6× fast = dizzy 😵 · double-click = celebrate · drag = move · right-click = menu
 
-**Fun menu:** feed a snack 🍪 · dance party 💃 · dev jokes 😂 · tips 💡 · walk around 🚶
+**🎯 Slingshot:** press and hold the pet for half a second, pull back and let go. It flies like an angry bird, bounces off screen edges and can land on your other monitor, then gives you a motivational quote 💪.
+
+**Fun menu:** feed a snack 🍪 · dance party 💃 · dev jokes 😂 · tips 💡 · motivate me 💪 · walk around 🚶
 
 **Pets:** Giggles Cat · Cyborg Bot · Bunny · Panda · Dino · Fox · Koala
 
