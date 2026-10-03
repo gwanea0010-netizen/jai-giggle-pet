@@ -5,8 +5,9 @@ node_modules/
 dist/
 build/pet-hook.exe
 
-# local notes
+# local notes & secrets (the vault lives in %APPDATA%, this is just a safety net)
 PROMPT.md
+vault*.json*
 
 # OS / editor
 Thumbs.db

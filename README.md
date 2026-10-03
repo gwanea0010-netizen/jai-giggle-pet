@@ -55,6 +55,18 @@ Open Visual Studio, SSMS, VS Code or Azure Data Studio and the pet notices ("�
 
 Everything runs locally and nothing is sent anywhere. Turn it off in Settings → Code & SQL helper.
 
+## Password vault 🔐
+
+Right-click the pet → **Password vault** (or Settings → Open vault) to keep passwords and secure notes:
+
+- Encrypted with **AES-256-GCM**; the key comes from your master password via **scrypt**. The master password is never stored.
+- Saved only on this PC (`%APPDATA%\Giggles Pet\vault.json`). Never synced to the team folder, GitHub or the share zip.
+- Auto-locks after 5 minutes idle, when you close the window, lock Windows (Win+L) or the PC sleeps. Repeated wrong tries add a wait.
+- Copy username / password with one click. Copied passwords are wiped from the clipboard after 20 seconds.
+- Strong password generator, search, secure notes, change master password.
+
+⚠️ If you forget the master password, the data can't be recovered.
+
 ## Wardrobe 👕
 
 Every finished task counts. Outfits unlock automatically and the pet puts each new one on with a party:

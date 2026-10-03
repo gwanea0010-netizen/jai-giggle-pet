@@ -246,6 +246,8 @@
     })
   );
 
+  $('vault-btn').addEventListener('click', () => api.openVault());
+
   // ---------- Claude Code hooks ----------
   async function refreshHooks(st) {
     st = st || (await api.hooksStatus());

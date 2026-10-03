@@ -12,6 +12,7 @@ const { spawn } = require('child_process');
 const SPECIES = require('./renderer/species.js');
 const { ACCESSORIES, activeFestival, isUnlocked } = require('./renderer/accessories.js');
 const updater = require('./lib/updater.js');
+const { Vault, generatePassword } = require('./lib/vault.js');
 const hooks = require('./scripts/install-hooks.js');
 const { createSharePackage } = require('./scripts/share.js');
 const team = require('./lib/team.js');
@@ -444,6 +445,9 @@ function handleHookEvent(evt) {
     case 'restart':
       restartPet();
       break;
+    case 'vault':
+      openVault();
+      break;
     default:
       // manual / test states (scripts/send.js)
       if (['done', 'working', 'attention', 'hello', 'sleep', 'snack', 'dance', 'joke', 'tip', 'quote', 'codetest', 'music', 'call', 'preview', 'festival'].includes(name)) {
@@ -823,6 +827,7 @@ ipcMain.handle('team:leave', () => {
 ipcMain.handle('team:open', () => settings.teamFolder && shell.openPath(team.dirOf(settings.teamFolder)));
 ipcMain.on('pet:trigger', (_e, { state, detail }) => broadcast('pet-event', { state, detail, session: 'manual' }));
 ipcMain.on('open-settings', openSettings);
+ipcMain.on('open-vault', () => openVault());
 
 ipcMain.on('context-menu', () => {
   const trigger = (state, detail) => () => broadcast('pet-event', { state, detail, session: 'manual' });
@@ -832,6 +837,7 @@ ipcMain.on('context-menu', () => {
     { label: 'Settings ⚙️', click: () => openSettings('pet') },
     { label: 'Wardrobe 👕', click: () => openSettings('wardrobe') },
     { label: 'Team leaderboard 🏆', click: () => openSettings('team') },
+    { label: 'Password vault 🔐', click: openVault },
     {
       label: 'Size',
       submenu: SIZES.map((s) => ({
@@ -873,6 +879,98 @@ ipcMain.on('context-menu', () => {
   menu.popup({ window: win });
 });
 
+// ---------- vault (encrypted passwords & notes, this PC only) ----------
+let vault = null;
+let vaultWin = null;
+let vaultLockTimer = null;
+let clipClearTimer = null;
+const VAULT_IDLE_MS = 5 * 60 * 1000;
+
+function getVault() {
+  if (!vault) vault = new Vault(process.env.GIGGLES_VAULT_FILE || path.join(app.getPath('userData'), 'vault.json'));
+  return vault;
+}
+
+function touchVault() {
+  clearTimeout(vaultLockTimer);
+  if (getVault().isUnlocked()) vaultLockTimer = setTimeout(lockVault, VAULT_IDLE_MS);
+}
+
+function lockVault() {
+  clearTimeout(vaultLockTimer);
+  getVault().lock();
+  if (vaultWin && !vaultWin.isDestroyed()) vaultWin.webContents.send('vault-locked');
+}
+
+function vaultStatus() {
+  const v = getVault();
+  return { exists: v.exists(), unlocked: v.isUnlocked() };
+}
+
+function openVault() {
+  if (vaultWin && !vaultWin.isDestroyed()) {
+    vaultWin.show();
+    vaultWin.focus();
+    return;
+  }
+  vaultWin = new BrowserWindow({
+    width: 560,
+    height: 720,
+    minWidth: 420,
+    minHeight: 520,
+    title: 'Vault',
+    icon: ICON,
+    autoHideMenuBar: true,
+    backgroundColor: '#0f1424',
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      spellcheck: false,
+    },
+  });
+  vaultWin.loadFile(path.join(__dirname, 'renderer', 'vault.html'));
+  vaultWin.on('closed', () => {
+    vaultWin = null;
+    lockVault(); // closing the window always locks
+  });
+  broadcast('pet-event', { state: 'vault' });
+}
+
+// Wraps a vault action: refreshes the auto-lock timer and turns errors into { error }.
+const vaultCall = (fn) => async (_e, ...args) => {
+  try {
+    const result = await fn(...args);
+    touchVault();
+    return { ok: true, result };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+};
+
+ipcMain.handle('vault:status', () => vaultStatus());
+ipcMain.handle('vault:create', vaultCall((pw) => { getVault().create(pw); return vaultStatus(); }));
+ipcMain.handle('vault:unlock', vaultCall((pw) => { getVault().unlock(pw); return vaultStatus(); }));
+ipcMain.handle('vault:lock', () => { lockVault(); return vaultStatus(); });
+ipcMain.handle('vault:list', vaultCall(() => getVault().list()));
+ipcMain.handle('vault:get', vaultCall((id) => getVault().get(id)));
+ipcMain.handle('vault:save', vaultCall((entry) => getVault().upsert(entry || {})));
+ipcMain.handle('vault:delete', vaultCall((id) => getVault().remove(id)));
+ipcMain.handle('vault:change-master', vaultCall((oldPw, newPw) => getVault().changeMaster(oldPw, newPw)));
+ipcMain.handle('vault:generate', (_e, len) => generatePassword(Math.min(64, Math.max(8, Number(len) || 18))));
+// Copies a field to the clipboard and wipes it after 20s (if it's still there).
+ipcMain.handle('vault:copy', vaultCall((id, field) => {
+  const e = getVault().get(id);
+  const value = String(e[field === 'username' ? 'username' : 'password'] || '');
+  clipboard.writeText(value);
+  lastClip = value; // the code helper must not review it
+  clearTimeout(clipClearTimer);
+  clipClearTimer = setTimeout(() => {
+    if (clipboard.readText() === value) clipboard.writeText('');
+  }, 20000);
+  return true;
+}));
+
 // Relaunch with the same exe + args (installed app and source checkout alike).
 // Release the single-instance lock first so the new process doesn't think we're still running.
 function restartPet() {
@@ -889,6 +987,10 @@ app.on('second-instance', () => broadcast('pet-event', { state: 'hello' }));
 
 app.whenReady().then(() => {
   if (process.platform === 'win32') app.setAppUserModelId('Giggles Pet');
+  // Locking Windows (Win+L) or sleeping locks the vault too.
+  const { powerMonitor } = require('electron');
+  powerMonitor.on('lock-screen', () => vault && lockVault());
+  powerMonitor.on('suspend', () => vault && lockVault());
   loadSettings();
   // Installed app: start with Windows by default (first run), and keep the startup entry
   // pointing at the current exe so the pet comes back after reboots and updates.
@@ -928,6 +1030,7 @@ app.whenReady().then(() => {
 
 app.on('before-quit', () => {
   app.isQuitting = true;
+  if (vault) lockVault();
   // Quitting with an update waiting: install it quietly (no relaunch).
   if (pendingUpdate && settings.autoUpdate && !installing) {
     installing = true;

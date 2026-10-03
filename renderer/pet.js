@@ -480,6 +480,10 @@
       case 'joke': tellJoke(); break;
       case 'quote': showQuote(); break;
       case 'codetest': reviewCode(detail || ''); break;
+      case 'vault':
+        if (state === 'idle' || state === 'music') setLook('happy', 'smile');
+        showBubble(pick(['🔐 Your secrets are safe with me!', '🤫 I’ll guard them. Pinky promise!', '🔒 Locked tight, only you have the key.']), { ms: 3000 });
+        break;
       case 'tip': showTip(); break;
       case 'preview': previewItem(detail); break;
       case 'unlock': setTimeout(() => goUnlock(detail), 4800); break; // after the "done" party

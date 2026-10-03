@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'" />
+  <title>Vault</title>
+  <link rel="stylesheet" href="settings.css" />
+  <link rel="stylesheet" href="vault.css" />
+</head>
+<body>
+  <header class="hero vault-hero">
+    <div class="lock-badge">🔐</div>
+    <div>
+      <h1>Vault</h1>
+      <p>Passwords &amp; notes, encrypted on this PC only</p>
+    </div>
+    <button id="lock-btn" class="ghost" hidden>🔒 Lock</button>
+  </header>
+
+  <main>
+    <!-- first run -->
+    <section class="view card" id="view-setup" hidden>
+      <h2>Create your master password</h2>
+      <p class="hint">This one password unlocks everything. It is never saved anywhere. <b>If you forget it, nobody can recover your data.</b></p>
+      <label class="field"><span>Master password (min 8 characters)</span><input type="password" id="setup-pw" autocomplete="new-password" /></label>
+      <label class="field"><span>Repeat it</span><input type="password" id="setup-pw2" autocomplete="new-password" /></label>
+      <div class="meter"><div id="setup-meter"></div></div>
+      <p class="error" id="setup-error"></p>
+      <button class="primary wide" id="setup-btn">Create vault</button>
+    </section>
+
+    <!-- locked -->
+    <section class="view card" id="view-unlock" hidden>
+      <h2>Unlock</h2>
+      <label class="field"><span>Master password</span><input type="password" id="unlock-pw" autocomplete="current-password" /></label>
+      <p class="error" id="unlock-error"></p>
+      <button class="primary wide" id="unlock-btn">Unlock</button>
+    </section>
+
+    <!-- list -->
+    <section class="view" id="view-list" hidden>
+      <div class="toolbar">
+        <input id="search" placeholder="🔍 Search…" autocomplete="off" />
+        <button class="primary" id="add-login">+ Password</button>
+        <button id="add-note">+ Note</button>
+      </div>
+      <ul class="entries" id="entries"></ul>
+      <p class="hint center" id="empty-hint">Nothing saved yet. Add your first password or note.</p>
+      <details class="card master">
+        <summary>Change master password</summary>
+        <label class="field"><span>Current master password</span><input type="password" id="cm-old" autocomplete="current-password" /></label>
+        <label class="field"><span>New master password</span><input type="password" id="cm-new" autocomplete="new-password" /></label>
+        <p class="error" id="cm-error"></p>
+        <button id="cm-btn">Change</button>
+      </details>
+    </section>
+
+    <!-- add / edit -->
+    <section class="view card" id="view-edit" hidden>
+      <h2 id="edit-title">New password</h2>
+      <label class="field"><span>Title</span><input id="e-title" placeholder="e.g. Production SQL server" autocomplete="off" /></label>
+      <div class="login-only">
+        <label class="field"><span>Username / email</span><input id="e-username" autocomplete="off" /></label>
+        <label class="field"><span>Password</span>
+          <div class="input-row">
+            <input type="password" id="e-password" autocomplete="new-password" />
+            <button id="e-show" title="Show / hide">👁️</button>
+            <button id="e-gen" title="Generate a strong password">🎲</button>
+          </div>
+        </label>
+        <div class="meter"><div id="e-meter"></div></div>
+        <label class="field"><span>Website / server</span><input id="e-url" autocomplete="off" /></label>
+      </div>
+      <label class="field"><span>Notes</span><textarea id="e-notes" rows="6"></textarea></label>
+      <p class="error" id="edit-error"></p>
+      <div class="input-row end">
+        <button id="e-delete" class="danger-text" hidden>Delete</button>
+        <span class="spacer"></span>
+        <button id="e-cancel">Cancel</button>
+        <button class="primary" id="e-save">Save</button>
+      </div>
+    </section>
+  </main>
+
+  <div class="toast" id="toast"></div>
+  <footer>🔐 AES-256 encrypted · auto-locks after 5 minutes · Developed by <b>Jai Panwar</b></footer>
+  <script src="vault.js"></script>
+</body>
+</html>
