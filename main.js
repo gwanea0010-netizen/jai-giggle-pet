@@ -73,6 +73,7 @@ const DEFAULTS = {
   teamFolder: '',
   memberId: '',
   hooksWanted: true,
+  loginItemInit: false,
   updateSource: '',
   autoUpdate: true,
   codeHelper: true,
@@ -874,6 +875,17 @@ app.on('second-instance', () => broadcast('pet-event', { state: 'hello' }));
 app.whenReady().then(() => {
   if (process.platform === 'win32') app.setAppUserModelId('Giggles Pet');
   loadSettings();
+  // Installed app: start with Windows by default (first run), and keep the startup entry
+  // pointing at the current exe so the pet comes back after reboots and updates.
+  if (app.isPackaged) {
+    if (!settings.loginItemInit) {
+      settings.startWithWindows = true;
+      settings.loginItemInit = true;
+      saveSettings();
+    }
+    applyLoginItem();
+  }
+
   // Installed app: stay connected to Claude Code unless the user disconnected on purpose
   // (also repairs the hooks if an update or another tool removed them).
   if (app.isPackaged && settings.hooksWanted && !hooks.status(HOOK_COMMAND).installed) {
