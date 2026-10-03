@@ -310,13 +310,17 @@
       ready: [`🎁 ${u.version} ready to install${u.notes ? `: ${u.notes}` : ''}`, 'ok'],
       dev: [`${v} (source checkout) · ${u.version} published`, 'muted'],
       error: [`${v} · Couldn't check: ${u.error}`, 'bad'],
+      failed: [`⚠️ ${v} · ${u.version} didn't install automatically. Use "Download" to install it once by hand.`, 'bad'],
       idle: [`${v}`, 'muted'],
     };
     const [text, cls] = map[u.status] || map.idle;
     el.textContent = text;
     el.className = `status ${cls}`;
     $('update-install').hidden = u.status !== 'ready';
+    $('update-download').hidden = u.status !== 'failed';
+    $('update-download').dataset.url = u.download || '';
   }
+  $('update-download').addEventListener('click', () => api.openExternal($('update-download').dataset.url));
   api.onUpdateState(renderUpdate);
   $('update-check').addEventListener('click', async () => renderUpdate(await api.updateCheck()));
   $('update-install').addEventListener('click', () => api.updateInstall());

@@ -53,6 +53,7 @@ contextBridge.exposeInMainWorld('pet', {
     onMatch: on('vault-match'),
   },
   openVault: () => ipcRenderer.send('open-vault'),
+  openExternal: (url) => ipcRenderer.send('open-external', url),
   onUpdateState: on('update-state'),
   updateState: () => ipcRenderer.invoke('update:state'),
   updateCheck: () => ipcRenderer.invoke('update:check'),

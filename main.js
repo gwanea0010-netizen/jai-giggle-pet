@@ -105,6 +105,10 @@ function loadSettings() {
   settings.stats = { ...DEFAULTS.stats, ...settings.stats };
   settings.equipped = { ...DEFAULTS.equipped, ...settings.equipped };
   settings.collected = Array.isArray(settings.collected) ? settings.collected : [];
+  // An update we tried to install is now running: forget the attempt.
+  if (settings.updateAttempt && updater.compare(app.getVersion(), settings.updateAttempt.version) >= 0) {
+    delete settings.updateAttempt;
+  }
   if (!settings.memberId) {
     settings.memberId = require('crypto').randomUUID();
     saveSettings();
@@ -243,6 +247,9 @@ async function checkForUpdates() {
     const { manifest, newer } = await updater.check(source, app.getVersion());
     if (!newer) return setUpdateState({ status: 'latest' });
     if (!app.isPackaged) return setUpdateState({ status: 'dev', version: manifest.version });
+    if (updateKeepsFailing(manifest.version)) {
+      return setUpdateState({ status: 'failed', version: manifest.version, download: manualDownloadUrl() });
+    }
     if (!pendingUpdate || pendingUpdate.version !== manifest.version) {
       setUpdateState({ status: 'downloading', version: manifest.version });
       const file = await updater.fetchInstaller(source, manifest);
@@ -255,12 +262,36 @@ async function checkForUpdates() {
   }
 }
 
+// Remember install attempts so a broken update can't loop (restart → retry → restart…).
+function updateKeepsFailing(version) {
+  const a = settings.updateAttempt;
+  return !!a && a.version === version && a.count >= 2;
+}
+
+function recordUpdateAttempt(version) {
+  const a = settings.updateAttempt && settings.updateAttempt.version === version ? settings.updateAttempt : { version, count: 0 };
+  settings.updateAttempt = { version, count: a.count + 1, at: Date.now() };
+  saveSettings(true); // we're about to quit
+}
+
+function manualDownloadUrl() {
+  const src = updateSource();
+  return updater.isUrl(src) ? `${src.replace(/\/?$/, '/')}Giggles-Pet-Setup.exe` : src;
+}
+
 function installUpdate() {
   if (!pendingUpdate || installing) return false;
   installing = true;
+  recordUpdateAttempt(pendingUpdate.version);
   broadcast('pet-event', { state: 'updating', detail: pendingUpdate.version });
   setTimeout(() => {
-    updater.runInstaller(pendingUpdate.file, true);
+    try {
+      updater.runInstaller(pendingUpdate.file, true);
+    } catch (err) {
+      installing = false;
+      setUpdateState({ status: 'error', error: `couldn't start the installer: ${err.message}` });
+      return;
+    }
     app.quit();
   }, 2500);
   return true;
@@ -268,7 +299,8 @@ function installUpdate() {
 
 // Auto-install once Claude has been quiet for a few minutes.
 setInterval(() => {
-  if (pendingUpdate && settings.autoUpdate && !installing && Date.now() - lastHookEvent > 3 * 60 * 1000) installUpdate();
+  if (pendingUpdate && settings.autoUpdate && !installing && !updateKeepsFailing(pendingUpdate.version)
+    && Date.now() - lastHookEvent > 3 * 60 * 1000) installUpdate();
 }, 30 * 1000);
 
 // ---------- team leaderboard (shared folder) ----------
@@ -906,6 +938,11 @@ ipcMain.handle('team:open', () => settings.teamFolder && shell.openPath(team.dir
 ipcMain.on('pet:trigger', (_e, { state, detail }) => broadcast('pet-event', { state, detail, session: 'manual' }));
 ipcMain.on('open-settings', openSettings);
 ipcMain.on('open-vault', () => openVault());
+// Only our own download links / release folder (never arbitrary URLs from a page).
+ipcMain.on('open-external', (_e, url) => {
+  const allowed = manualDownloadUrl();
+  if (url && url === allowed) updater.isUrl(url) ? shell.openExternal(url) : shell.openPath(url);
+});
 
 ipcMain.on('context-menu', () => {
   const trigger = (state, detail) => () => broadcast('pet-event', { state, detail, session: 'manual' });
@@ -1129,9 +1166,10 @@ app.on('before-quit', () => {
   app.isQuitting = true;
   if (vault) lockVault();
   // Quitting with an update waiting: install it quietly (no relaunch).
-  if (pendingUpdate && settings.autoUpdate && !installing) {
+  if (pendingUpdate && settings.autoUpdate && !installing && !updateKeepsFailing(pendingUpdate.version)) {
     installing = true;
-    updater.runInstaller(pendingUpdate.file, false);
+    recordUpdateAttempt(pendingUpdate.version);
+    try { updater.runInstaller(pendingUpdate.file, false); } catch { /* try again next time */ }
   }
   stopMonitor();
   saveSettings(true);
