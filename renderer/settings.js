@@ -144,12 +144,42 @@
     return h < 24 ? `${h} h ago` : `${Math.round(h / 24)} d ago`;
   }
 
+  // ---------- team: Supabase or shared folder ----------
+  function showTeamMode(mode) {
+    document.querySelectorAll('[data-mode]').forEach((b) => b.classList.toggle('active', b.dataset.mode === mode));
+    $('mode-cloud').hidden = mode !== 'cloud';
+    $('mode-folder').hidden = mode !== 'folder';
+  }
+  document.querySelectorAll('[data-mode]').forEach((b) => b.addEventListener('click', () => showTeamMode(b.dataset.mode)));
+
+  $('cloud-join').addEventListener('click', async () => {
+    const btn = $('cloud-join');
+    btn.disabled = true;
+    btn.textContent = '⏳ Connecting…';
+    $('cloud-error').textContent = '';
+    const r = await api.teamJoinCloud({ url: $('cloud-url').value, key: $('cloud-key').value, code: $('team-code').value });
+    btn.disabled = false;
+    btn.textContent = '☁️ Join team';
+    if (!r.ok) return ($('cloud-error').textContent = `❌ ${r.error}`);
+    $('team-code').value = '';
+    refreshTeam();
+  });
+
+  const BADGE = Object.fromEntries(PET_ACHIEVEMENTS.ACHIEVEMENTS.map((a) => [a.id, a]));
+
   async function refreshTeam() {
     const t = await api.teamGet();
-    $('team-setup').hidden = !!t.folder;
-    $('team-board').hidden = !t.folder;
-    if (!t.folder) return;
-    $('team-folder').textContent = `📁 ${t.folder}`;
+    $('team-setup').hidden = !!t.mode;
+    $('team-board').hidden = !t.mode;
+    $('cloud-fields').hidden = t.hasDefaultCloud;
+    if (t.hasDefaultCloud) $('cloud-hint').textContent = 'Enter the team code your team lead shared with you.';
+    if (!$('cloud-url').value && t.cloudUrl) $('cloud-url').value = t.cloudUrl;
+    if (!t.mode) return;
+    $('team-folder').textContent = t.error
+      ? `⚠️ ${t.error}`
+      : t.mode === 'cloud' ? `☁️ Supabase · ${t.cloudUrl.replace(/^https?:\/\//, '')}` : `📁 ${t.folder}`;
+    $('team-folder').className = `status ${t.error ? 'bad' : 'muted'}`;
+    $('team-open').hidden = t.mode !== 'folder';
     const members = [...t.members];
     if (boardMode === 'total') members.sort((a, b) => b.total - a.total);
     const list = $('board');
@@ -166,7 +196,8 @@
       li.innerHTML = `
         <span class="rank">${score > 0 && medals[i] ? medals[i] : i + 1}</span>
         <span class="mini">${PetSVG('tm-' + i)}</span>
-        <span class="who"><b>${esc(m.ownerName)}${m.id === t.me ? ' (you)' : ''}</b><small>${esc(m.petName)} · ${ago(m.updatedAt)}</small></span>
+        <span class="who"><b>${esc(m.ownerName)}${m.id === t.me ? ' (you)' : ''}</b><small>${esc(m.petName)} · ${ago(m.updatedAt)}</small>
+          <span class="tags" title="${esc((m.badges || []).map((id) => (BADGE[id] || {}).name).filter(Boolean).join(', '))}">${(m.badges || []).slice(-8).map((id) => (BADGE[id] || {}).emoji || '').join('')}</span></span>
         <span class="score"><b>${score}</b><small>${boardMode === 'today' ? 'today' : 'all time'}</small></span>`;
       dress(li.querySelector('.pet'), m);
       list.appendChild(li);
@@ -174,11 +205,50 @@
   }
 
   $('team-pick').addEventListener('click', async () => { await api.teamPick(); refreshTeam(); });
-  $('team-change').addEventListener('click', async () => { await api.teamPick(); refreshTeam(); });
+  $('team-change').addEventListener('click', async () => {
+    await api.teamLeave(); // back to the setup card to pick Supabase or another folder
+    refreshTeam();
+  });
   $('team-leave').addEventListener('click', async () => { await api.teamLeave(); refreshTeam(); });
   $('team-refresh').addEventListener('click', refreshTeam);
   $('team-open').addEventListener('click', () => api.teamOpen());
   setInterval(() => document.querySelector('[data-panel="team"].active') && refreshTeam(), 30000);
+
+  // ---------- badges ----------
+  function renderBadges() {
+    const { ACHIEVEMENTS, context } = PET_ACHIEVEMENTS;
+    const have = new Set(S.badges || []);
+    const ctx = context(S.stats, S.achStats, S.collected);
+    $('b-count').textContent = have.size;
+    $('b-of').textContent = `of ${ACHIEVEMENTS.length} badges`;
+    $('badges').innerHTML = '';
+    for (const a of ACHIEVEMENTS) {
+      const got = have.has(a.id);
+      const val = Math.min(a.value(ctx), a.goal);
+      const el = document.createElement('div');
+      el.className = `item badge${got ? ' equipped' : ' locked'}`;
+      el.innerHTML = `<span class="emoji">${a.emoji}</span><b>${esc(a.name)}</b><small>${esc(a.desc)}</small>
+        ${got ? '<small>✅ Earned</small>' : `<div class="bar"><div class="bar-fill" style="width:${Math.round((val / a.goal) * 100)}%"></div></div><small>${val} / ${a.goal}</small>`}`;
+      $('badges').appendChild(el);
+    }
+  }
+
+  // ---------- weather ----------
+  async function checkWeather() {
+    $('weather-status').textContent = '⏳ Checking…';
+    const r = await api.weatherRefresh();
+    if (!r.ok) return ($('weather-status').textContent = `❌ ${r.error}`);
+    const w = r.weather;
+    $('weather-status').textContent = w ? `✅ ${w.place}: ${w.temp}°C, ${w.kind}` : 'Weather is off.';
+  }
+  $('weatherCity').addEventListener('change', async () => {
+    await save({ weatherCity: $('weatherCity').value });
+    checkWeather();
+  });
+  $('weather-check').addEventListener('click', async () => {
+    if ($('weatherCity').value.trim() !== (S.weatherCity || '')) await save({ weatherCity: $('weatherCity').value });
+    checkWeather();
+  });
 
   // ---------- render ----------
   function render() {
@@ -204,7 +274,8 @@
     $('scale').value = S.scale;
     $('scale-out').textContent = `${Math.round(S.scale * 100)}%`;
 
-    for (const k of ['sound', 'media', 'codeHelper', 'roam', 'notifications', 'startWithWindows']) $(k).checked = !!S[k];
+    for (const k of ['sound', 'media', 'codeHelper', 'dayNight', 'roam', 'notifications', 'startWithWindows']) $(k).checked = !!S[k];
+    if (document.activeElement !== $('weatherCity')) $('weatherCity').value = S.weatherCity || '';
     $('volume').value = S.volume;
     $('tipsEvery').value = String(S.tipsEvery);
     $('autoUpdate').checked = S.autoUpdate !== false;
@@ -213,6 +284,7 @@
     $('stat-today').textContent = S.stats && S.stats.date === today() ? S.stats.today : 0;
     $('stat-total').textContent = (S.stats && S.stats.total) || 0;
     renderWardrobe();
+    renderBadges();
   }
 
   async function save(patch) {
@@ -231,7 +303,7 @@
   $('scale').addEventListener('change', () => save({ scale: Number($('scale').value) }));
   $('volume').addEventListener('change', () => save({ volume: Number($('volume').value) }));
   $('tipsEvery').addEventListener('change', () => save({ tipsEvery: Number($('tipsEvery').value) }));
-  for (const k of ['sound', 'media', 'codeHelper', 'roam', 'notifications', 'startWithWindows']) {
+  for (const k of ['sound', 'media', 'codeHelper', 'dayNight', 'roam', 'notifications', 'startWithWindows']) {
     $(k).addEventListener('change', () => save({ [k]: $(k).checked }));
   }
 

@@ -59,7 +59,7 @@ main { max-width: 640px; margin: 0 auto; padding: 18px 18px 8px; display: grid; 
 @media (max-width: 520px) { .grid2 { grid-template-columns: 1fr; } }
 
 .field { display: grid; gap: 6px; font-size: 12.5px; color: var(--muted); font-weight: 600; }
-input[type="text"], input:not([type]), select {
+input[type="text"], input[type="password"], input:not([type]), select {
   font: inherit;
   color: var(--text);
   background: var(--field);
@@ -69,7 +69,7 @@ input[type="text"], input:not([type]), select {
   outline: none;
   transition: border-color .15s, box-shadow .15s;
 }
-input:not([type]):focus, select:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(30, 136, 229, .15); }
+input:not([type]):focus, input[type="password"]:focus, select:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(30, 136, 229, .15); }
 input[type="range"] { accent-color: var(--blue); width: 100%; }
 
 .hint { margin: 10px 0 0; color: var(--muted); font-size: 12.5px; }
@@ -205,6 +205,17 @@ h3 { font-size: 13.5px; margin: 14px 0 6px; }
 .board-foot .actions { display: flex; gap: 6px; flex-wrap: wrap; }
 .empty { color: var(--muted); text-align: center; padding: 16px; }
 
+.team-mode { margin: 12px 0; }
+#mode-cloud, #mode-folder { display: grid; gap: 10px; }
+#mode-cloud[hidden], #mode-folder[hidden] { display: none; }
+.cloud-fields { display: grid; gap: 10px; }
+.cloud-fields[hidden] { display: none; }
+.error-text { color: #e5484d; font-weight: 600; margin: 0; min-height: 1em; }
+.badges { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
+.badge .emoji { font-size: 34px; }
+.badge.locked .emoji { filter: grayscale(1); opacity: .45; }
+.badge .bar { margin-top: 6px; width: 100%; height: 6px; }
+.board .who .tags { display: block; font-size: 13px; letter-spacing: 1px; }
 .input-row { display: flex; gap: 8px; }
 .input-row input { flex: 1; min-width: 0; }
 .festival-card { background: linear-gradient(120deg, rgba(255, 153, 51, .14), rgba(255, 79, 163, .12), rgba(59, 130, 246, .12)); }

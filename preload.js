@@ -19,6 +19,10 @@ contextBridge.exposeInMainWorld('pet', {
   onFlyBounce: on('fly-bounce'),
   onFlyDone: on('fly-done'),
   contextMenu: () => ipcRenderer.send('context-menu'),
+  stat: (key) => ipcRenderer.send('stat', key),
+  onWeather: on('weather'),
+  weatherRefresh: () => ipcRenderer.invoke('weather:refresh'),
+  weatherGet: () => ipcRenderer.invoke('weather:get'),
 
   // shared / settings window
   getSettings: () => ipcRenderer.invoke('settings:get'),
@@ -34,6 +38,7 @@ contextBridge.exposeInMainWorld('pet', {
   buildInstaller: () => ipcRenderer.invoke('build:installer'),
   teamGet: () => ipcRenderer.invoke('team:get'),
   teamPick: () => ipcRenderer.invoke('team:pick'),
+  teamJoinCloud: (cfg) => ipcRenderer.invoke('team:join-cloud', cfg),
   teamLeave: () => ipcRenderer.invoke('team:leave'),
   teamOpen: () => ipcRenderer.invoke('team:open'),
   vault: {

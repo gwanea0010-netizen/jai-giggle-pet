@@ -20,6 +20,7 @@
   <nav class="tabs" role="tablist">
     <button role="tab" data-tab="pet">🐾 My Pet</button>
     <button role="tab" data-tab="wardrobe">👕 Wardrobe</button>
+    <button role="tab" data-tab="badges">🏅 Badges</button>
     <button role="tab" data-tab="team">🏆 Team</button>
     <button role="tab" data-tab="settings">⚙️ Settings</button>
   </nav>
@@ -96,17 +97,49 @@
       <p class="hint center">Locked items: click to preview them on your pet for a few seconds 👀</p>
     </section>
 
+    <!-- ================= BADGES ================= -->
+    <section class="panel" data-panel="badges">
+      <div class="card progress-card">
+        <div class="progress-head">
+          <div>
+            <h2>🏅 Badges</h2>
+            <p class="hint">Earn badges by working, exploring and having fun with your pet. Your teammates see them on the leaderboard.</p>
+          </div>
+          <div class="big-count"><b id="b-count">0</b><span id="b-of">of 0</span></div>
+        </div>
+      </div>
+      <div class="items badges" id="badges"></div>
+    </section>
+
     <!-- ================= TEAM ================= -->
     <section class="panel" data-panel="team">
       <div class="card" id="team-setup">
         <h2>🏆 Team leaderboard</h2>
-        <p>See who finishes the most Claude tasks today. Everyone's pet shows up with its outfit!</p>
-        <ol class="steps">
-          <li>Pick a folder the whole team can reach: a <b>shared network drive</b> (<code>\\server\share</code>), a synced <b>OneDrive / SharePoint / Teams</b> folder, or <b>Google Drive</b></li>
-          <li>Every developer picks the <b>same folder</b> in their pet</li>
-          <li>Only names, pet looks and task counts are shared, never code</li>
-        </ol>
-        <button id="team-pick" class="primary">📁 Choose team folder</button>
+        <p>See who finishes the most Claude tasks today, with everyone's pet, outfit and badges. Only names, pet looks, badges and task counts are shared, never code.</p>
+
+        <div class="seg team-mode">
+          <button data-mode="cloud" class="active">☁️ Supabase (recommended)</button>
+          <button data-mode="folder">📁 Shared folder</button>
+        </div>
+
+        <div id="mode-cloud">
+          <p class="hint" id="cloud-hint">Ask the person who set up the team (see <code>supabase/setup.sql</code>) for these. Never use the <b>service_role</b> key here, only the <b>anon public</b> key.</p>
+          <div class="cloud-fields" id="cloud-fields">
+            <label class="field"><span>Supabase project URL</span><input id="cloud-url" placeholder="https://xxxx.supabase.co" autocomplete="off" /></label>
+            <label class="field"><span>Anon public key</span><input id="cloud-key" placeholder="eyJhbGciOi…" autocomplete="off" /></label>
+          </div>
+          <label class="field"><span>Team code</span><input id="team-code" type="password" placeholder="The code your team lead shared" autocomplete="off" /></label>
+          <p class="error-text" id="cloud-error"></p>
+          <button id="cloud-join" class="primary">☁️ Join team</button>
+        </div>
+
+        <div id="mode-folder" hidden>
+          <ol class="steps">
+            <li>Pick a folder the whole team can reach: a <b>shared network drive</b> (<code>\\server\share</code>), a synced <b>OneDrive / SharePoint / Teams</b> folder, or <b>Google Drive</b></li>
+            <li>Every developer picks the <b>same folder</b> in their pet</li>
+          </ol>
+          <button id="team-pick" class="primary">📁 Choose team folder</button>
+        </div>
       </div>
 
       <div class="card" id="team-board" hidden>
@@ -166,6 +199,19 @@
           <button id="hooks-btn" class="primary">Connect</button>
         </div>
         <p class="hint">Restart Claude Code after connecting. The pet only receives the event type, project folder and tool name, never your prompts or code.</p>
+      </div>
+
+      <div class="card">
+        <h2>🌦️ Weather &amp; time of day</h2>
+        <label class="toggle"><input type="checkbox" id="dayNight" /><span class="sw"></span><div><b>Day &amp; night</b><small>Moon and stars at night (and a sleepier pet), chai in the morning</small></div></label>
+        <label class="field" style="margin-top:12px">
+          <span>Your city, for live weather (umbrella in rain, scarf when cold, sun on hot days). Leave empty to turn off</span>
+          <div class="input-row">
+            <input id="weatherCity" placeholder="e.g. Jaipur" autocomplete="off" />
+            <button id="weather-check">Check</button>
+          </div>
+        </label>
+        <p class="hint" id="weather-status"></p>
       </div>
 
       <div class="card">
@@ -248,6 +294,7 @@
 
   <script src="species.js"></script>
   <script src="accessories.js"></script>
+  <script src="achievements.js"></script>
   <script src="pet-svg.js"></script>
   <script src="settings.js"></script>
 </body>

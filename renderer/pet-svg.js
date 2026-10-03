@@ -41,6 +41,33 @@
     <filter id="${id('blur')}" x="-30%" y="-200%" width="160%" height="500%"><feGaussianBlur stdDeviation="2.5"/></filter>
   </defs>
 
+  <!-- sky: time of day + weather (behind the pet) -->
+  <g class="p-sky">
+    <g class="p-moon"><path d="M38 12 A15 15 0 1 0 38 42 A17 17 0 0 1 38 12 Z"/></g>
+    <g class="p-stars">
+      <path style="--d:0s" d="M58 12 l1.6 3.4 3.4 1.6 -3.4 1.6 -1.6 3.4 -1.6 -3.4 -3.4 -1.6 3.4 -1.6 Z"/>
+      <path style="--d:.7s" d="M14 52 l1.2 2.6 2.6 1.2 -2.6 1.2 -1.2 2.6 -1.2 -2.6 -2.6 -1.2 2.6 -1.2 Z"/>
+      <path style="--d:1.4s" d="M176 18 l1.4 3 3 1.4 -3 1.4 -1.4 3 -1.4 -3 -3 -1.4 3 -1.4 Z"/>
+      <path style="--d:2.1s" d="M188 60 l1 2.2 2.2 1 -2.2 1 -1 2.2 -1 -2.2 -2.2 -1 2.2 -1 Z"/>
+    </g>
+    <g class="p-sun">
+      <g class="p-sun-rays"><path d="M174 6 V0 M174 42 V48 M156 24 H150 M192 24 H198 M161 11 L157 7 M187 37 L191 41 M187 11 L191 7 M161 37 L157 41"/></g>
+      <circle cx="174" cy="24" r="11"/>
+    </g>
+    <g class="p-cloud"><path d="M138 40 a10 10 0 0 1 10 -12 a13 13 0 0 1 24 -2 a9 9 0 0 1 12 10 a7 7 0 0 1 -2 14 h-40 a7 7 0 0 1 -4 -10 Z"/></g>
+    <g class="p-rain">
+      <line style="--d:0s" x1="18" y1="0" x2="14" y2="12"/><line style="--d:.35s" x1="42" y1="10" x2="38" y2="22"/>
+      <line style="--d:.15s" x1="166" y1="4" x2="162" y2="16"/><line style="--d:.5s" x1="188" y1="20" x2="184" y2="32"/>
+      <line style="--d:.25s" x1="10" y1="60" x2="6" y2="72"/><line style="--d:.6s" x1="194" y1="70" x2="190" y2="82"/>
+      <line style="--d:.45s" x1="26" y1="100" x2="22" y2="112"/><line style="--d:.1s" x1="180" y1="110" x2="176" y2="122"/>
+    </g>
+    <g class="p-snow">
+      <text style="--d:0s" x="16" y="10">❄</text><text style="--d:1.2s" x="44" y="0">❄</text>
+      <text style="--d:.6s" x="170" y="6">❄</text><text style="--d:1.8s" x="190" y="30">❄</text>
+      <text style="--d:2.4s" x="8" y="60">❄</text>
+    </g>
+  </g>
+
   <ellipse class="p-shadow" cx="100" cy="183" rx="50" ry="7" filter="url(#${id('blur')})"/>
 
   <g class="p-body-group">
@@ -256,6 +283,13 @@
       </g>
     </g>
 
+    <!-- weather wear -->
+    <g class="p-scarf">
+      <path d="M56 134 Q100 152 144 134 L146 145 Q100 164 54 145 Z" class="p-scarf-band"/>
+      <path d="M118 148 L124 174 L136 171 L130 146 Z" class="p-scarf-band"/>
+      <path d="M60 138 L66 147 M74 142 L80 151 M88 145 L93 154 M104 146 L108 155 M120 144 L124 152 M134 140 L138 148" class="p-scarf-stripe"/>
+    </g>
+
     <g class="p-phones">
       <path class="p-band" d="M44 110 C42 48 158 48 156 110"/>
       <rect class="p-cup" x="33" y="98" width="19" height="32" rx="9"/>
@@ -295,7 +329,28 @@
     </g>
 
     <path class="p-sweat" d="M154 84 C158 91 160 95 156 98 C152 100 149 96 151 92 Z"/>
+
+    <!-- umbrella for rain / storms, held in the right hand -->
+    <g class="p-umbrella">
+      <path d="M128 30 L160 136" class="p-umb-stick"/>
+      <path d="M160 136 q4 8 -3 9" class="p-umb-stick"/>
+      <g transform="rotate(14 128 30)">
+        <path d="M70 36 Q128 -16 186 36 Q176 30 166 36 Q157 29 147 36 Q138 29 128 36 Q119 29 109 36 Q100 29 90 36 Q80 30 70 36 Z" class="p-umb-top"/>
+        <path d="M128 36 Q128 10 128 -4 M109 36 Q114 12 128 -4 M147 36 Q142 12 128 -4 M90 36 Q100 14 128 -4 M166 36 Q156 14 128 -4" class="p-umb-ribs"/>
+        <circle cx="128" cy="-5" r="2.5" class="p-umb-tip"/>
+      </g>
+    </g>
   </g>
+
+  <!-- morning chai -->
+  <g class="p-chai">
+    <path d="M18 158 h20 v14 a8 8 0 0 1 -8 8 h-4 a8 8 0 0 1 -8 -8 Z" class="p-cup"/>
+    <path d="M38 162 a5 5 0 0 1 0 10" class="p-cup-handle"/>
+    <rect x="18" y="158" width="20" height="4" rx="1" class="p-chai-top"/>
+    <path d="M24 154 q-3 -5 0 -10 q3 -5 0 -10 M32 154 q-3 -5 0 -10 q3 -5 0 -10" class="p-steam"/>
+  </g>
+
+  <rect class="p-flash" x="-20" y="-20" width="240" height="240"/>
 
   <!-- props (stay on the ground) -->
   <g class="acc acc-diya">

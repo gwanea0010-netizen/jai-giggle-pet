@@ -97,11 +97,31 @@ Right-click → **Wardrobe** to swap items. Click a locked item to preview it.
 
 ## Team leaderboard 🏆
 
-1. Right-click → **Team leaderboard** → **Choose team folder**
-2. Pick a folder everyone can reach: shared network drive, synced OneDrive / SharePoint / Teams folder, or Google Drive
-3. Every teammate picks the same folder
+The leaderboard lives on **Supabase**. Everyone's pet, outfit, badges and task counts show up for the whole team; nothing else is shared.
 
-Shows today / all-time rankings with everyone's pet in its outfit. Only names, pet looks and task counts are shared.
+**For teammates:** right-click the pet → **Team leaderboard** → enter the **team code** → **Join team**.
+
+**One-time setup (team lead):**
+1. Supabase dashboard → **SQL Editor** → New query → paste [`supabase/setup.sql`](supabase/setup.sql) → **Run**
+2. Pick a long team code and create the team (same SQL editor):
+   ```sql
+   insert into public.pet_teams (name, code_hash)
+   values ('Cyborg ERP', encode(sha256(convert_to('YOUR-TEAM-CODE', 'UTF8')), 'hex'));
+   ```
+3. Share the team code with the developers
+
+The pets use the project's **anon** key (built in via `package.json` → `teamCloud`). The tables aren't exposed; the pets can only call two database functions, and only with a valid team code. Never put the `service_role` key in the app.
+
+No Supabase? Pick **📁 Shared folder** in the Team tab (network drive / OneDrive / Google Drive) instead.
+
+## Badges 🏅
+
+19 badges, such as First Steps, Busy Bee (10 tasks in a day), Week Warrior (7-day streak), Night Owl, Early Bird, Juggler (3 projects in a day), Frequent Flyer (slingshot), Foodie, Query Guardian and Festive Spirit. The pet throws a party when you earn one, and teammates see your badges on the leaderboard.
+
+## Weather & time of day 🌦️
+
+- **Day & night:** moon and stars at night (and a sleepier pet), chai ☕ in the morning
+- **Weather:** enter your city in Settings → the pet carries an umbrella in rain, wears a scarf when it's cold, shows the sun on hot days, and gets a storm cloud with lightning in thunderstorms. Weather comes from [Open-Meteo](https://open-meteo.com) (free, no key); only the city name is sent.
 
 ## Settings
 

@@ -16,6 +16,10 @@
   "private": true,
   "main": "main.js",
   "updateUrl": "https://github.com/gwanea0010-netizen/jai-giggle-pet/releases/latest/download",
+  "teamCloud": {
+    "url": "https://tharaasderylzodsnvoe.supabase.co",
+    "key": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRoYXJhYXNkZXJ5bHpvZHNudm9lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTEwMjMzOTcsImV4cCI6MjEwNjU5OTM5N30.XLEXmg69cOdH1Lpb9PK8bBwELUrLVbhVhK3s7Xqw7EI"
+  },
   "scripts": {
     "postinstall": "node scripts/setup.js",
     "start": "electron .",

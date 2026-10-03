@@ -16,6 +16,9 @@ const { Vault, generatePassword } = require('./lib/vault.js');
 const hooks = require('./scripts/install-hooks.js');
 const { createSharePackage } = require('./scripts/share.js');
 const team = require('./lib/team.js');
+const teamcloud = require('./lib/teamcloud.js');
+const ACH = require('./renderer/achievements.js');
+const weather = require('./lib/weather.js');
 
 // The installed app ships a small native hook (no Node.js needed on the machine).
 const HOOK_COMMAND = app.isPackaged
@@ -72,6 +75,11 @@ const DEFAULTS = {
   equipped: { head: '', face: '', neck: '', body: '', prop: '' },
   collected: [],
   teamFolder: '',
+  teamMode: '', // '' | 'cloud' (Supabase) | 'folder'
+  cloudUrl: '',
+  cloudKey: '',
+  teamCode: '',
+  badges: [],
   memberId: '',
   hooksWanted: true,
   loginItemInit: false,
@@ -80,10 +88,15 @@ const DEFAULTS = {
   codeHelper: true,
   vaultAutoLock: 'manual', // 'manual' | 'winlock' | '5' | '15' | '60'
   vaultHints: true, // show saved logins when their site is open in Chrome/Edge
+  weatherCity: '', // e.g. "Jaipur"; empty = no weather
+  dayNight: true, // moon & stars at night, chai in the morning
+  achStats: {}, // counters for achievements (see renderer/achievements.js)
 };
 const VAULT_LOCK_OPTIONS = ['manual', 'winlock', '5', '15', '60'];
-const EDITABLE = ['ownerName', 'petName', 'species', 'scale', 'sound', 'volume', 'notifications', 'roam', 'media', 'tipsEvery', 'startWithWindows', 'teamFolder', 'updateSource', 'autoUpdate', 'codeHelper', 'vaultAutoLock', 'vaultHints'];
-const PUBLIC_KEYS = ['ownerName', 'petName', 'species', 'equipped', 'teamFolder'];
+const EDITABLE = ['ownerName', 'petName', 'species', 'scale', 'sound', 'volume', 'notifications', 'roam', 'media', 'tipsEvery', 'startWithWindows', 'teamFolder', 'updateSource', 'autoUpdate', 'codeHelper', 'vaultAutoLock', 'vaultHints',
+  'teamMode', 'cloudUrl', 'cloudKey', 'teamCode', 'weatherCity', 'dayNight'];
+const PUBLIC_KEYS = ['ownerName', 'petName', 'species', 'equipped', 'teamFolder', 'teamMode', 'teamCode'];
+const LONG_TEXT = { teamFolder: 500, updateSource: 500, cloudUrl: 300, cloudKey: 2000, teamCode: 120, weatherCity: 80 };
 
 let settings = { ...DEFAULTS };
 const settingsFile = () => path.join(app.getPath('userData'), 'settings.json');
@@ -105,6 +118,8 @@ function loadSettings() {
   settings.stats = { ...DEFAULTS.stats, ...settings.stats };
   settings.equipped = { ...DEFAULTS.equipped, ...settings.equipped };
   settings.collected = Array.isArray(settings.collected) ? settings.collected : [];
+  settings.badges = Array.isArray(settings.badges) ? settings.badges : [];
+  if (!settings.teamMode && settings.teamFolder) settings.teamMode = 'folder'; // pre-3.7 shared-folder teams
   // An update we tried to install is now running: forget the attempt.
   if (settings.updateAttempt && updater.compare(app.getVersion(), settings.updateAttempt.version) >= 0) {
     delete settings.updateAttempt;
@@ -133,7 +148,7 @@ function sanitize(patch) {
     let v = patch[key];
     if (typeof DEFAULTS[key] === 'boolean') v = !!v;
     else if (typeof DEFAULTS[key] === 'number') v = Number(v) || 0;
-    else v = String(v).trim().slice(0, ['teamFolder', 'updateSource'].includes(key) ? 500 : 40);
+    else v = String(v).trim().slice(0, LONG_TEXT[key] || 40);
     out[key] = v;
   }
   if (patch.equipped && typeof patch.equipped === 'object') {
@@ -166,6 +181,7 @@ function updateSettings(patch) {
   }
   if (settings.vaultHints !== prev.vaultHints) restartMonitorForUrl();
   if (settings.vaultAutoLock !== prev.vaultAutoLock) touchVault();
+  if (settings.weatherCity !== prev.weatherCity) refreshWeather();
   saveSettings();
   broadcast('settings', clean);
   if (settingsWin && !settingsWin.isDestroyed()) settingsWin.webContents.send('settings', settings);
@@ -176,11 +192,27 @@ function broadcast(channel, data) {
   if (win && !win.isDestroyed()) win.webContents.send(channel, data);
 }
 
-function bumpStats() {
-  const today = new Date().toLocaleDateString('en-CA');
+function bumpStats(project = '') {
+  const now = new Date();
+  const today = now.toLocaleDateString('en-CA');
   if (settings.stats.date !== today) settings.stats = { ...settings.stats, date: today, today: 0 };
   settings.stats.today += 1;
   settings.stats.total += 1;
+
+  // Counters for achievements.
+  const a = { ...settings.achStats };
+  const yesterday = new Date(now.getTime() - 864e5).toLocaleDateString('en-CA');
+  if (a.lastDay !== today) a.streak = a.lastDay === yesterday ? (a.streak || 0) + 1 : 1;
+  a.lastDay = today;
+  a.bestDay = Math.max(a.bestDay || 0, settings.stats.today);
+  const h = now.getHours();
+  if (h >= 22 || h < 5) a.night = (a.night || 0) + 1;
+  if (h >= 5 && h < 8) a.early = (a.early || 0) + 1;
+  if (now.getDay() === 0 || now.getDay() === 6) a.weekend = (a.weekend || 0) + 1;
+  if (a.projDay !== today) { a.projDay = today; a.projects = []; }
+  if (project && !a.projects.includes(project)) a.projects = [...a.projects, project].slice(-20);
+  settings.achStats = a;
+  checkAchievements();
 
   // Wardrobe unlocks: auto-wear the new item.
   const unlocked = ACCESSORIES.find((a) => !a.festival && a.unlock === settings.stats.total);
@@ -196,6 +228,55 @@ function bumpStats() {
   checkRank();
   return settings.stats.today;
 }
+
+// ---------- weather (Open-Meteo, city from Settings) ----------
+let weatherGeo = null; // { city, lat, lon, place }
+let lastWeather = null;
+
+async function refreshWeather() {
+  const city = (settings.weatherCity || '').trim();
+  if (!city) {
+    lastWeather = null;
+    broadcast('weather', null);
+    return { ok: true, weather: null };
+  }
+  try {
+    if (!weatherGeo || weatherGeo.city !== city.toLowerCase()) {
+      weatherGeo = { city: city.toLowerCase(), ...(await weather.geocode(city)) };
+    }
+    lastWeather = await weather.current(weatherGeo);
+    broadcast('weather', lastWeather);
+    return { ok: true, weather: lastWeather };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+}
+ipcMain.handle('weather:refresh', () => refreshWeather());
+ipcMain.handle('weather:get', () => lastWeather);
+
+// ---------- achievements ----------
+function checkAchievements() {
+  const ctx = ACH.context(settings.stats, settings.achStats, settings.collected);
+  const fresh = ACH.unlocked(ctx).filter((id) => !settings.badges.includes(id));
+  if (!fresh.length) return;
+  settings.badges = [...settings.badges, ...fresh];
+  saveSettings();
+  broadcast('settings', { badges: settings.badges });
+  if (settingsWin && !settingsWin.isDestroyed()) settingsWin.webContents.send('settings', settings);
+  const list = fresh.map((id) => ACH.ACHIEVEMENTS.find((x) => x.id === id));
+  // Celebrate one at a time, after any "done" party.
+  list.forEach((b, i) => setTimeout(() => broadcast('pet-event', { state: 'badge', detail: `${b.emoji} ${b.name}`, sub: b.desc }), 5200 + i * 6000));
+  publishTeam();
+}
+
+// Fun counters reported by the pet window (slingshot, snacks, pats, code checks).
+const FUN_STATS = ['flings', 'snacks', 'pats', 'codeChecks'];
+ipcMain.on('stat', (_e, key) => {
+  if (!FUN_STATS.includes(key)) return;
+  settings.achStats = { ...settings.achStats, [key]: (settings.achStats[key] || 0) + 1 };
+  saveSettings();
+  checkAchievements();
+});
 
 // ---------- festivals ----------
 // While a festival is on, the pet collects its outfit for good and wears it.
@@ -213,6 +294,7 @@ function checkFestival() {
   broadcast('settings', { equipped: eq, collected: settings.collected });
   if (settingsWin && !settingsWin.isDestroyed()) settingsWin.webContents.send('settings', settings);
   publishTeam();
+  checkAchievements();
   const owner = settings.ownerName || 'friend';
   setTimeout(() => broadcast('pet-event', {
     state: 'festival',
@@ -303,26 +385,65 @@ setInterval(() => {
     && Date.now() - lastHookEvent > 3 * 60 * 1000) installUpdate();
 }, 30 * 1000);
 
-// ---------- team leaderboard (shared folder) ----------
-function publishTeam() {
-  if (!settings.teamFolder) return;
-  team.publish(settings.teamFolder, {
+// ---------- team leaderboard (Supabase cloud or a shared folder) ----------
+const TEAM_CLOUD_DEFAULTS = require('./package.json').teamCloud || {};
+let lastTeamError = '';
+
+function teamBackend() {
+  if (settings.teamMode === 'cloud') {
+    const cfg = {
+      url: settings.cloudUrl || TEAM_CLOUD_DEFAULTS.url,
+      key: settings.cloudKey || TEAM_CLOUD_DEFAULTS.key,
+      code: settings.teamCode,
+    };
+    return cfg.url && cfg.key && cfg.code ? { kind: 'cloud', cfg } : null;
+  }
+  if (settings.teamMode === 'folder' && settings.teamFolder) return { kind: 'folder', folder: settings.teamFolder };
+  return null;
+}
+
+function teamMember() {
+  return {
     id: settings.memberId,
     ownerName: settings.ownerName || 'Anonymous',
     petName: settings.petName,
     species: settings.species,
     equipped: settings.equipped,
+    badges: settings.badges || [],
     date: settings.stats.date,
     today: settings.stats.today,
     total: settings.stats.total,
-  });
+  };
+}
+
+async function publishTeam() {
+  const be = teamBackend();
+  if (!be) return;
+  try {
+    if (be.kind === 'cloud') await teamcloud.publish(be.cfg, teamMember());
+    else team.publish(be.folder, teamMember());
+    lastTeamError = '';
+  } catch (err) {
+    lastTeamError = err.message;
+  }
+}
+
+async function readBoard() {
+  const be = teamBackend();
+  if (!be) return [];
+  if (be.kind === 'cloud') return teamcloud.read(be.cfg);
+  return team.read(be.folder);
 }
 
 let lastRank = null;
 // Fun nudges: tell the owner when they take #1 today, or when someone passes them.
-function checkRank() {
-  if (!settings.teamFolder) return;
-  const board = team.read(settings.teamFolder).filter((m) => m.today > 0);
+async function checkRank() {
+  let board;
+  try {
+    board = (await readBoard()).filter((m) => m.today > 0);
+  } catch {
+    return;
+  }
   const idx = board.findIndex((m) => m.id === settings.memberId);
   if (idx < 0 || board.length < 2) return;
   const rank = idx + 1;
@@ -487,7 +608,7 @@ function handleHookEvent(evt) {
       broadcast('pet-event', { state: 'working', project, session, detail: describeTool(evt.tool_name) });
       break;
     case 'Stop': {
-      const count = bumpStats();
+      const count = bumpStats(project);
       broadcast('pet-event', { state: 'done', project, session, count });
       notify(`${pet} 🎉`, project ? `Claude finished in ${project}!` : 'Claude finished the task!');
       break;
@@ -915,23 +1036,55 @@ ipcMain.handle('build:installer', () => new Promise((resolve, reject) => {
   });
 }));
 
-ipcMain.handle('team:get', () => ({
-  folder: settings.teamFolder,
-  me: settings.memberId,
-  members: settings.teamFolder ? team.read(settings.teamFolder) : [],
-}));
+ipcMain.handle('team:get', async () => {
+  const be = teamBackend();
+  let members = [];
+  let error = lastTeamError;
+  if (be) {
+    try {
+      members = await readBoard();
+      error = '';
+    } catch (err) {
+      error = err.message;
+    }
+  }
+  return {
+    mode: be ? be.kind : '',
+    folder: settings.teamFolder,
+    cloudUrl: settings.cloudUrl || TEAM_CLOUD_DEFAULTS.url || '',
+    hasDefaultCloud: !!(TEAM_CLOUD_DEFAULTS.url && TEAM_CLOUD_DEFAULTS.key),
+    me: settings.memberId,
+    members,
+    error,
+  };
+});
+// Join the Supabase leaderboard: verifies the URL/key/code by publishing our row first.
+ipcMain.handle('team:join-cloud', async (_e, { url, key, code } = {}) => {
+  const cfg = {
+    url: String(url || TEAM_CLOUD_DEFAULTS.url || '').trim(),
+    key: String(key || TEAM_CLOUD_DEFAULTS.key || '').trim(),
+    code: String(code || '').trim(),
+  };
+  try {
+    await teamcloud.publish(cfg, teamMember());
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+  updateSettings({ teamMode: 'cloud', cloudUrl: url || '', cloudKey: key || '', teamCode: cfg.code });
+  return { ok: true };
+});
 ipcMain.handle('team:pick', async () => {
   const res = await dialog.showOpenDialog(settingsWin || win, {
     title: 'Choose a folder your whole team can access',
     properties: ['openDirectory', 'createDirectory'],
   });
   if (res.canceled || !res.filePaths[0]) return settings.teamFolder;
-  updateSettings({ teamFolder: res.filePaths[0] });
+  updateSettings({ teamMode: 'folder', teamFolder: res.filePaths[0] });
   publishTeam();
   return settings.teamFolder;
 });
 ipcMain.handle('team:leave', () => {
-  updateSettings({ teamFolder: '' });
+  updateSettings({ teamMode: '', teamFolder: '', teamCode: '' });
   return '';
 });
 ipcMain.handle('team:open', () => settings.teamFolder && shell.openPath(team.dirOf(settings.teamFolder)));
@@ -1157,6 +1310,9 @@ app.whenReady().then(() => {
     checkRank();
   }, 2 * 60 * 1000);
   setTimeout(checkFestival, 6000);
+  setTimeout(checkAchievements, 9000); // badges for work done before this version
+  setTimeout(refreshWeather, 4000);
+  setInterval(refreshWeather, 30 * 60 * 1000);
   setInterval(checkFestival, 60 * 60 * 1000);
   setTimeout(checkForUpdates, 20 * 1000);
   setInterval(checkForUpdates, 3 * 60 * 60 * 1000);

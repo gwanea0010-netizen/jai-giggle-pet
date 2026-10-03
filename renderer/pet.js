@@ -271,6 +271,7 @@
   }
 
   function goSnack() {
+    window.pet.stat('snacks');
     setState('eat');
     setLook('open', 'o');
     lookAt(0, -4);
@@ -395,6 +396,7 @@
   function reviewCode(text) {
     const r = CodeCheck.review(text);
     if (!r || ['fly', 'aim', 'eat'].includes(state)) return;
+    window.pet.stat('codeChecks');
     const label = r.kind === 'sql' ? '🔍 SQL check' : '🔍 Code check';
     if (!r.issues.length) {
       if (state === 'idle') setLook('happy', 'grin');
@@ -487,6 +489,14 @@
       case 'tip': showTip(); break;
       case 'preview': previewItem(detail); break;
       case 'unlock': setTimeout(() => goUnlock(detail), 4800); break; // after the "done" party
+      case 'badge':
+        setState('done');
+        setLook('happy', 'grin');
+        showBubble(`🏅 Badge unlocked: ${detail}`, { sub: sub || '', cls: 'tip', ms: 5000 });
+        burstConfetti(70);
+        play('chime');
+        after(4600, settle);
+        break;
       case 'festival':
         setState('done');
         setLook('happy', 'grin');
@@ -522,6 +532,57 @@
         setTimeout(() => callOn && endCall(), 8000);
         break;
     }
+  });
+
+  // ---------- time of day & weather ----------
+  let wx = null;
+  let lastWxKind = null;
+  let lastTod = '';
+
+  function timeOfDay(h = new Date().getHours()) {
+    if (h >= 21 || h < 5) return 'night';
+    if (h < 10) return 'morning';
+    if (h >= 17) return 'evening';
+    return 'day';
+  }
+
+  function applySky() {
+    const t = S.dayNight === false ? '' : timeOfDay();
+    for (const x of ['night', 'morning', 'evening', 'day']) pet.classList.toggle(`tod-${x}`, t === x);
+    for (const k of ['clear', 'cloudy', 'fog', 'rain', 'storm', 'snow', 'hot', 'cold']) pet.classList.toggle(`wx-${k}`, !!wx && wx.kind === k);
+    pet.classList.toggle('wx-day', !!wx && wx.isDay);
+    if (t !== lastTod) {
+      if (lastTod && t === 'night' && state === 'idle') {
+        showBubble(`🌙 It's getting late, ${owner()}. Don't forget to rest!`, { cls: 'tip', ms: 5000 });
+      }
+      lastTod = t;
+    }
+  }
+  setInterval(applySky, 60 * 1000);
+
+  function weatherLine(w) {
+    const city = String(w.place || '').split(',')[0];
+    const o = owner();
+    return {
+      rain: `🌧️ It's raining in ${city}. Take an umbrella, ${o}!`,
+      storm: `⛈️ Thunderstorm in ${city}! Save your work, ${o}.`,
+      snow: `❄️ It's snowing in ${city}! Stay warm.`,
+      hot: `🥵 ${w.temp}°C in ${city}! Drink some water, ${o}.`,
+      cold: `🧣 ${w.temp}°C in ${city}, chilly! Scarf on.`,
+      fog: `🌫️ Foggy in ${city}. Drive carefully!`,
+      cloudy: `☁️ Cloudy in ${city}, ${w.temp}°C.`,
+      clear: w.isDay ? `☀️ ${w.temp}°C and sunny in ${city}.` : `✨ Clear sky in ${city}, ${w.temp}°C.`,
+    }[w.kind];
+  }
+
+  window.pet.onWeather((w) => {
+    wx = w;
+    applySky();
+    if (!w) { lastWxKind = null; return; }
+    if (w.kind !== lastWxKind && ['idle', 'music'].includes(state)) {
+      showBubble(weatherLine(w), { sub: '🌦️ Weather', cls: 'tip', ms: 5000 });
+    }
+    lastWxKind = w.kind;
   });
 
   // ---------- vault: saved logins for the site open in Chrome/Edge ----------
@@ -613,6 +674,7 @@
     S = { ...S, ...next };
     pet.dataset.species = S.species;
     if (next.equipped) applyWardrobe();
+    if ('dayNight' in next && booted) applySky();
     document.documentElement.style.setProperty('--s', S.scale);
     Sfx.setVolume(S.volume);
     if (!S.media) clearMedia();
@@ -689,7 +751,8 @@
     const now = Date.now();
     for (const [s, ts] of workingSessions) if (now - ts > WORKING_STALE_MS) workingSessions.delete(s);
     if (state === 'working' && workingSessions.size === 0) goIdle();
-    if (state === 'idle' && !hovering && !callOn && now - lastActivity > SLEEP_AFTER_MS) goSleep();
+    const sleepAfter = pet.classList.contains('tod-night') ? 2 * 60 * 1000 : SLEEP_AFTER_MS; // sleepier at night
+    if (state === 'idle' && !hovering && !callOn && now - lastActivity > sleepAfter) goSleep();
     if (S.tipsEvery > 0 && now - lastTip > S.tipsEvery * 60000 && (state === 'idle' || state === 'music') && !callOn) {
       lastTip = now;
       showTip();
@@ -776,6 +839,7 @@
 
   function petted() {
     lastActivity = Date.now();
+    window.pet.stat('pats');
     if (state === 'sleep') goIdle(true);
     hearts();
     play('purr');
@@ -895,6 +959,7 @@
     hideBubble();
     play('whee');
     window.pet.fling(-px * POWER, -py * POWER);
+    window.pet.stat('flings');
   }
 
   window.pet.onFlyBounce(() => {
@@ -1100,6 +1165,8 @@
     applySettings(s);
     booted = true;
     scheduleBlink();
+    applySky();
+    window.pet.weatherGet().then((w) => { if (w) { wx = w; lastWxKind = w.kind; applySky(); } });
     goHello();
     setTimeout(offerVaultUnlock, 5000);
   });

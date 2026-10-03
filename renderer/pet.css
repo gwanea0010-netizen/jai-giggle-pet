@@ -251,6 +251,51 @@
 .p-crown { fill: #ffc83d; stroke: #d99a00; stroke-width: 2; stroke-linejoin: round; }
 @keyframes capeFlow { 0%, 100% { transform: skewX(0) scaleX(1); } 50% { transform: skewX(-4deg) scaleX(1.04); } }
 
+/* ---------- Time of day & weather ---------- */
+.p-sky > g, .p-scarf, .p-umbrella, .p-chai { display: none; }
+.p-flash { fill: #fff; opacity: 0; pointer-events: none; }
+
+.pet.tod-night .p-moon, .pet.tod-night .p-stars { display: inline; }
+.p-moon path { fill: #ffe9a6; filter: drop-shadow(0 0 4px rgba(255, 233, 166, .8)); }
+.p-stars path { fill: #fff6c8; opacity: .2; animation: starTwinkle 2.8s ease-in-out var(--d) infinite; transform-box: fill-box; transform-origin: center; }
+
+.pet.tod-morning .p-chai { display: inline; }
+.p-cup { fill: #fff; stroke: #c7cfdc; stroke-width: 1.5; }
+.p-cup-handle { fill: none; stroke: #c7cfdc; stroke-width: 2.5; }
+.p-chai-top { fill: #c98b4f; }
+.p-steam { fill: none; stroke: #c7cfdc; stroke-width: 2; stroke-linecap: round; opacity: .7; animation: steam 2s ease-in-out infinite; }
+
+.pet.wx-clear.wx-day .p-sun, .pet.wx-hot .p-sun { display: inline; }
+.p-sun circle { fill: #ffd23f; filter: drop-shadow(0 0 5px rgba(255, 200, 60, .9)); }
+.p-sun-rays { stroke: #ffc83d; stroke-width: 2.5; stroke-linecap: round; transform-origin: 174px 24px; animation: spin 12s linear infinite; }
+.pet.wx-hot .p-sweat { animation: drip 2.4s ease-in infinite; }
+
+.pet.wx-cloudy .p-cloud, .pet.wx-fog .p-cloud, .pet.wx-rain .p-cloud, .pet.wx-storm .p-cloud { display: inline; }
+.p-cloud path { fill: #dfe5ef; stroke: #b9c3d3; stroke-width: 1.5; animation: drift 8s ease-in-out infinite alternate; }
+.pet.wx-storm .p-cloud path { fill: #8f99ab; }
+
+.pet.wx-rain .p-rain, .pet.wx-storm .p-rain { display: inline; }
+.p-rain line { stroke: #6fb7ff; stroke-width: 2; stroke-linecap: round; opacity: 0; animation: rainFall .9s linear var(--d) infinite; }
+.pet.wx-rain .p-umbrella, .pet.wx-storm .p-umbrella { display: inline; }
+.p-umb-top { fill: #1d3f91; stroke: #102a66; stroke-width: 2; stroke-linejoin: round; }
+.p-umb-ribs { fill: none; stroke: #22a83a; stroke-width: 1.6; opacity: .9; }
+.p-umb-stick { fill: none; stroke: #5b4636; stroke-width: 3; stroke-linecap: round; }
+.p-umb-tip { fill: #ffd23f; }
+.pet.wx-storm .p-flash { animation: lightning 6s linear infinite; }
+
+.pet.wx-snow .p-snow { display: inline; }
+.p-snow text { font-size: 13px; fill: #e8f4ff; opacity: 0; animation: snowFall 4s linear var(--d) infinite; }
+.pet.wx-snow .p-scarf, .pet.wx-cold .p-scarf { display: inline; }
+.p-scarf-band { fill: #e5484d; stroke: #b8323a; stroke-width: 1.5; stroke-linejoin: round; }
+.p-scarf-stripe { stroke: #fff; stroke-width: 2.5; stroke-linecap: round; opacity: .85; }
+
+@keyframes starTwinkle { 0%, 100% { opacity: .2; transform: scale(.7); } 50% { opacity: 1; transform: scale(1.15); } }
+@keyframes steam { 0% { opacity: 0; transform: translateY(4px); } 40% { opacity: .7; } 100% { opacity: 0; transform: translateY(-6px); } }
+@keyframes drift { from { transform: translateX(-6px); } to { transform: translateX(6px); } }
+@keyframes rainFall { 0% { opacity: 0; transform: translateY(-10px); } 10% { opacity: .9; } 100% { opacity: 0; transform: translateY(70px); } }
+@keyframes snowFall { 0% { opacity: 0; transform: translate(0, -8px) rotate(0); } 15% { opacity: 1; } 100% { opacity: 0; transform: translate(10px, 150px) rotate(180deg); } }
+@keyframes lightning { 0%, 90%, 92%, 95%, 100% { opacity: 0; } 91%, 94% { opacity: .7; } }
+
 /* walking direction */
 .pet { transition: transform .2s; }
 .pet.face-left { transform: scaleX(-1); }
