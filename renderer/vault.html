@@ -21,10 +21,14 @@
     <!-- first run -->
     <section class="view card" id="view-setup" hidden>
       <h2>Create your master password</h2>
-      <p class="hint">This one password unlocks everything. It is never saved anywhere. <b>If you forget it, nobody can recover your data.</b></p>
+      <div class="warn-box">
+        <b>⚠️ Save your master password somewhere safe.</b>
+        <p>This one password unlocks everything in your vault and it is <b>never stored anywhere</b>. If you forget it, <b>your data cannot be recovered</b>, not by you, not by Jai, not by anyone. Write it down or keep it in a safe place before you continue.</p>
+      </div>
       <label class="field"><span>Master password (min 8 characters)</span><input type="password" id="setup-pw" autocomplete="new-password" /></label>
       <label class="field"><span>Repeat it</span><input type="password" id="setup-pw2" autocomplete="new-password" /></label>
       <div class="meter"><div id="setup-meter"></div></div>
+      <label class="check"><input type="checkbox" id="setup-ack" /> <span>I have saved my master password. I understand that if I forget it, my data cannot be recovered.</span></label>
       <p class="error" id="setup-error"></p>
       <button class="primary wide" id="setup-btn">Create vault</button>
     </section>
@@ -33,6 +37,7 @@
     <section class="view card" id="view-unlock" hidden>
       <h2>Unlock</h2>
       <label class="field"><span>Master password</span><input type="password" id="unlock-pw" autocomplete="current-password" /></label>
+      <p class="hint">Forgotten master passwords can't be recovered. That's what keeps your vault safe.</p>
       <p class="error" id="unlock-error"></p>
       <button class="primary wide" id="unlock-btn">Unlock</button>
     </section>
@@ -48,6 +53,7 @@
       <p class="hint center" id="empty-hint">Nothing saved yet. Add your first password or note.</p>
       <details class="card master">
         <summary>Change master password</summary>
+        <p class="hint">⚠️ Save the new master password somewhere safe first. If you forget it, your data cannot be recovered.</p>
         <label class="field"><span>Current master password</span><input type="password" id="cm-old" autocomplete="current-password" /></label>
         <label class="field"><span>New master password</span><input type="password" id="cm-new" autocomplete="new-password" /></label>
         <p class="error" id="cm-error"></p>

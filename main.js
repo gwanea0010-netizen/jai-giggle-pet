@@ -365,7 +365,29 @@ function applyScale() {
   const b = win.getBounds();
   const { w, h } = petSize(settings.scale);
   win.setBounds({ x: Math.round(b.x + (b.width - w) / 2), y: b.y + b.height - h, width: w, height: h });
+  ensureOnScreen();
   savePosition();
+}
+
+// Keep the whole pet inside the work area of the monitor it's on (it may peek a little past
+// the sides), so a resolution / scaling / monitor change can't leave it under the taskbar.
+function ensureOnScreen() {
+  if (!win || win.isDestroyed() || dragTimer || flyTimer || walkTimer) return;
+  const b = win.getBounds();
+  const wa = screen.getDisplayMatching(b).workArea;
+  const { w, h } = petSize(settings.scale);
+  const x = Math.round(Math.min(Math.max(b.x, wa.x - w * 0.25), wa.x + wa.width - w * 0.75));
+  const y = Math.round(Math.min(Math.max(b.y, wa.y - h * 0.3), wa.y + wa.height - h));
+  if (x !== b.x || y !== b.y || b.width !== w || b.height !== h) {
+    win.setBounds({ x, y, width: w, height: h });
+    savePosition();
+  }
+}
+
+let screenFixTimer = null;
+function scheduleEnsureOnScreen() {
+  clearTimeout(screenFixTimer);
+  screenFixTimer = setTimeout(ensureOnScreen, 600); // let Windows finish re-laying out displays
 }
 
 function savePosition() {
@@ -728,6 +750,7 @@ ipcMain.on('drag-start', () => {
 ipcMain.on('drag-end', () => {
   clearInterval(dragTimer);
   dragTimer = null;
+  ensureOnScreen(); // dropped below the taskbar or off the edge? pop back into view
   savePosition();
 });
 
@@ -1013,6 +1036,13 @@ app.whenReady().then(() => {
     }
   }
   createPetWindow();
+  win.once('ready-to-show', ensureOnScreen);
+  setTimeout(ensureOnScreen, 1500);
+  // Resolution, scaling or monitor changes: bring the pet back into view.
+  screen.on('display-metrics-changed', scheduleEnsureOnScreen);
+  screen.on('display-added', scheduleEnsureOnScreen);
+  screen.on('display-removed', scheduleEnsureOnScreen);
+  setInterval(ensureOnScreen, 30 * 1000);
   startServer();
   startMonitor();
   if (!settings.ownerName) setTimeout(() => openSettings('pet'), 1500);

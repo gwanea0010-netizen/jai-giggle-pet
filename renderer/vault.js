@@ -51,9 +51,11 @@
     const a = $('setup-pw').value;
     const b = $('setup-pw2').value;
     if (a !== b) return ($('setup-error').textContent = 'The two passwords don’t match');
+    if (!$('setup-ack').checked) return ($('setup-error').textContent = 'Please save your master password first, then tick the box.');
     const r = await V.create(a);
     if (!r.ok) return ($('setup-error').textContent = r.error);
     $('setup-pw').value = $('setup-pw2').value = '';
+    $('setup-ack').checked = false;
     toast('🔐 Vault created');
     refresh();
   });

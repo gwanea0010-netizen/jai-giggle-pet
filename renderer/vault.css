@@ -20,6 +20,14 @@ input[type="password"] {
 }
 input[type="password"]:focus, textarea:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(30, 136, 229, .15); }
 
+.warn-box {
+  border: 1.5px solid #f5b301; background: rgba(245, 179, 1, .12); border-radius: 12px; padding: 12px 14px;
+}
+.warn-box b:first-child { color: #f5b301; font-size: 14.5px; }
+.warn-box p { margin: 6px 0 0; font-size: 13px; line-height: 1.5; }
+.check { display: flex; gap: 10px; align-items: flex-start; font-size: 13px; cursor: pointer; }
+.check input { margin-top: 3px; width: 16px; height: 16px; accent-color: #22a83a; flex: none; }
+
 .meter { height: 6px; border-radius: 99px; background: var(--field); overflow: hidden; }
 .meter div { height: 100%; width: 0; transition: width .3s, background .3s; }
 
