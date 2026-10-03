@@ -1,4 +1,4 @@
-// Giggles — desktop pet for Claude Code (Cyborg ERP dev buddy).
+// Giggles Pet — Cyborg ERP dev buddy. Developed by Jai Panwar.
 // Main process: transparent pet window, settings window, local event server,
 // system monitor (music / mic / foreground app) and persisted settings.
 
@@ -204,9 +204,10 @@ let updateState = { status: 'idle' };
 let lastHookEvent = Date.now();
 let installing = false;
 
+// Custom source from Settings, else the GitHub releases of this repo (package.json "updateUrl").
+const DEFAULT_UPDATE_URL = require('./package.json').updateUrl || '';
 function updateSource() {
-  if (settings.updateSource) return settings.updateSource;
-  return settings.teamFolder ? path.join(settings.teamFolder, 'giggles-updates') : '';
+  return settings.updateSource || DEFAULT_UPDATE_URL;
 }
 
 function setUpdateState(s) {
@@ -594,9 +595,10 @@ ipcMain.handle('update:pick', async () => {
 });
 // Dev checkout only: bump version, build installer and publish it to the update folder.
 ipcMain.handle('update:publish', (_e, { level = 'patch', notes = '' } = {}) => new Promise((resolve, reject) => {
+  // A custom folder source publishes there; otherwise tag + push and GitHub builds the release.
   const source = updateSource();
-  if (!source || updater.isUrl(source)) return reject(new Error('Pick a team folder or an update folder first'));
-  const child = spawn('node', [path.join(__dirname, 'scripts', 'release.js'), level === 'minor' ? 'minor' : 'patch', '--folder', source, '--notes', String(notes).slice(0, 300)], {
+  const folderArgs = source && !updater.isUrl(source) ? ['--folder', source] : [];
+  const child = spawn('node', [path.join(__dirname, 'scripts', 'release.js'), level === 'minor' ? 'minor' : 'patch', ...folderArgs, '--notes', String(notes).slice(0, 200)], {
     cwd: __dirname,
     windowsHide: true,
   });
@@ -605,8 +607,8 @@ ipcMain.handle('update:publish', (_e, { level = 'patch', notes = '' } = {}) => n
   child.stderr.on('data', (d) => (log += d));
   child.on('error', reject);
   child.on('exit', (code) => {
-    const m = log.match(/Published (\S+)/);
-    if (code === 0 && m) resolve(`${m[1]} → ${source}`);
+    const m = log.match(/Published (.+?)[.:]?\s*$/m);
+    if (code === 0 && m) resolve(m[1]);
     else reject(new Error(log.split('\n').filter(Boolean).slice(-3).join(' ') || `exit code ${code}`));
   });
 }));

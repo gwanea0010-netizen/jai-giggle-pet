@@ -1,10 +1,17 @@
 #!/usr/bin/env node
-// Publishes a new pet version to the team's update folder.
-//   node scripts/release.js [patch|minor|major] [--notes "What changed"] [--folder "\\server\share\giggles-updates"]
-// Without --folder it uses GIGGLES_UPDATE_FOLDER, then the update source / team folder from your pet settings.
+// Ships a new pet version.
+//
+//   npm run release                         -> patch bump (3.1.0 -> 3.1.1)
+//   npm run release -- minor --notes "New outfits"
+//
+// Default (GitHub): bumps the version, commits, tags and pushes. The GitHub
+// workflow then builds the installer and publishes the release, and every
+// installed pet updates itself from there.
+//
+// Shared-folder mode (no GitHub):  npm run release -- --folder "\\server\share\giggles-updates"
+// builds locally and copies the installer + latest.json into that folder.
 
 const fs = require('fs');
-const os = require('os');
 const path = require('path');
 const { execSync } = require('child_process');
 const updater = require('../lib/updater.js');
@@ -16,45 +23,31 @@ const flag = (name) => {
   return i >= 0 ? args[i + 1] : undefined;
 };
 const level = ['patch', 'minor', 'major'].find((l) => args.includes(l)) || 'patch';
-const notes = flag('--notes') || process.env.GIGGLES_RELEASE_NOTES || '';
+const notes = (flag('--notes') || process.env.GIGGLES_RELEASE_NOTES || '').replace(/"/g, "'").slice(0, 200);
+const folder = flag('--folder') || process.env.GIGGLES_UPDATE_FOLDER;
+const run = (cmd) => execSync(cmd, { cwd: ROOT, stdio: 'inherit' });
+const out = (cmd) => execSync(cmd, { cwd: ROOT }).toString().trim();
 
-function resolveFolder() {
-  const explicit = flag('--folder') || process.env.GIGGLES_UPDATE_FOLDER;
-  if (explicit) return explicit;
-  try {
-    const appData = process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming');
-    const s = JSON.parse(fs.readFileSync(path.join(appData, 'Giggles Pet', 'settings.json'), 'utf8'));
-    if (s.updateSource && !updater.isUrl(s.updateSource)) return s.updateSource;
-    if (s.teamFolder) return path.join(s.teamFolder, 'giggles-updates');
-  } catch {
-    // no settings yet
-  }
-  return null;
+if (folder) {
+  // ---- shared folder release ----
+  run(`npm version ${level} --no-git-tag-version`);
+  const { version } = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
+  run('npm run dist');
+  const manifest = updater.publish(folder, path.join(ROOT, 'dist', 'Giggles-Pet-Setup.exe'), version, notes);
+  console.log(`Published ${manifest.file} (v${version}) to ${folder}`);
+  process.exit(0);
 }
 
-const folder = resolveFolder();
-if (!folder) {
-  console.error('No update folder. Pick a team folder in the pet (🏆 Team tab) or pass --folder <path>.');
+// ---- GitHub release ----
+if (out('git status --porcelain')) {
+  console.error('You have uncommitted changes. Commit them first (git add -A && git commit -m "...").');
   process.exit(1);
 }
-
-// 1. bump version
-const pkgPath = path.join(ROOT, 'package.json');
-const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
-const [ma, mi, pa] = pkg.version.split('.').map(Number);
-pkg.version = level === 'major' ? `${ma + 1}.0.0` : level === 'minor' ? `${ma}.${mi + 1}.0` : `${ma}.${mi}.${pa + 1}`;
-fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n');
-console.log(`Version → ${pkg.version}`);
-
-// 2. build installer
-execSync('npm run dist', { cwd: ROOT, stdio: 'inherit' });
-const setup = path.join(ROOT, 'dist', `Giggles-Pet-Setup-${pkg.version}.exe`);
-if (!fs.existsSync(setup)) {
-  console.error(`Build did not produce ${setup}`);
-  process.exit(1);
-}
-
-// 3. publish
-const manifest = updater.publish(folder, setup, pkg.version, notes);
-console.log(`Published ${manifest.file} to ${folder}`);
-console.log('Teammates update automatically within a few hours (or via Settings → Check for updates).');
+const message = notes ? `Release v%s: ${notes}` : 'Release v%s';
+run(`npm version ${level} -m "${message}"`);
+run('git push --follow-tags');
+const { version } = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
+const remote = out('git remote get-url origin').replace(/\.git$/, '');
+console.log(`\nPublished v${version}. GitHub is building the installer now (about 5 minutes):`);
+console.log(`  ${remote}/actions`);
+console.log(`Then it appears at ${remote}/releases and every pet updates itself.`);

@@ -175,9 +175,9 @@
         </div>
         <label class="toggle" style="margin-top:12px"><input type="checkbox" id="autoUpdate" /><span class="sw"></span><div><b>Update automatically</b><small>Installs quietly when Claude has been idle for a few minutes</small></div></label>
         <label class="field" style="margin-top:12px">
-          <span>Update source (folder or https URL). Leave empty to use the team folder</span>
+          <span>Update source (folder or https URL). Leave empty to use the official GitHub releases</span>
           <div class="input-row">
-            <input id="updateSource" placeholder="Uses <team folder>\giggles-updates" autocomplete="off" />
+            <input id="updateSource" placeholder="GitHub releases (default)" autocomplete="off" />
             <button id="update-pick">📁</button>
           </div>
         </label>
@@ -192,7 +192,7 @@
             </select>
             <button id="publish-btn" class="primary">Publish</button>
           </div>
-          <p class="hint" id="publish-status">Builds the installer and puts it in the update folder. Everyone's pet updates itself.</p>
+          <p class="hint" id="publish-status">Commit your changes first. This tags a new version and pushes it; GitHub builds the installer (~5 min) and everyone's pet updates itself.</p>
         </div>
       </div>
 
@@ -231,7 +231,7 @@
     </section>
   </main>
 
-  <footer>Cyborg ERP · Digital Transformation</footer>
+  <footer>Developed by <b>Jai Panwar</b> · Cyborg ERP · Digital Transformation</footer>
 
   <script src="species.js"></script>
   <script src="accessories.js"></script>

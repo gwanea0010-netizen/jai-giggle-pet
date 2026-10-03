@@ -1,27 +1,53 @@
-# Giggles Pet 🔺: Cyborg ERP dev buddy
+# Giggles Pet 🔺
 
-An animated desktop pet that lives on your screen and reacts to Claude Code. It works while Claude works, celebrates when the task is done, and pings you when Claude needs you.
+**Cyborg ERP dev buddy. Developed by [Jai Panwar](https://github.com/jai9997)**
 
-## Quick install (for teammates)
+An animated desktop pet that keeps you company while you code. It types along while your AI coding assistant works, throws a party when the task is done, and taps you on the shoulder when your input is needed.
 
-**Installer (recommended, nothing else needed):**
+## ⬇️ Install
 
-1. Double-click **`Giggles-Pet-Setup-3.1.0.exe`**. If Windows says "protected your PC", click **More info → Run anyway**
-2. The pet appears and is already connected to Claude Code. Enter your name in the Settings window that opens
-3. Restart Claude Code once
+**One line (PowerShell):**
 
-Uninstall from Windows "Installed apps". This also removes the Claude Code hooks.
+```powershell
+irm https://raw.githubusercontent.com/gwanea0010-netizen/jai-giggle-pet/main/install.ps1 | iex
+```
 
-**Zip (developers with Node.js 18+):** unzip `Giggles-Pet.zip` and double-click `Install-Giggles.bat`.
+**Or download:** [**Giggles-Pet-Setup.exe**](https://github.com/gwanea0010-netizen/jai-giggle-pet/releases/latest/download/Giggles-Pet-Setup.exe), then double-click it. If Windows says "protected your PC", click **More info → Run anyway**.
+
+The pet appears, connects itself and asks your name. Restart Claude Code once. No Node.js or anything else is needed.
+
+**Updates are automatic.** The pet checks for new versions, downloads them and updates itself quietly when you're idle.
+
+Uninstall from Windows "Installed apps".
+
+## What it does
+
+| When… | The pet… |
+|---|---|
+| The assistant is working | types on a laptop with the Cyborg ERP logo; the bubble shows "Editing code…", "Running a command…" |
+| **The task finishes** | **jumps, confetti, sparkles, chime + giggle: "All done, Jai! 🎉"** |
+| Your permission is needed | hops, waves, "!" badge, yellow bubble |
+| You play music / YouTube / Spotify | puts on headphones 🎧 and grooves to it, showing the song name |
+| You're on a call / using the mic | wears a headset with mic 🎙️ and goes quiet |
+| You open Chrome / Edge | thinks out loud: "🤔 What are we searching, Jai?" |
+| You finish 5/10/20… tasks in a day | trophy message 🏆 |
+| Nothing happens for 4 min | falls asleep 💤 |
+
+**Interactions:** click = tickle 😆 · rub back and forth = pat 💕 · click 6× fast = dizzy 😵 · double-click = celebrate · drag = move · right-click = menu
+
+**Fun menu:** feed a snack 🍪 · dance party 💃 · dev jokes 😂 · tips 💡 · walk around 🚶
+
+**Pets:** Giggles Cat · Cyborg Bot · Bunny · Panda · Dino · Fox · Koala
 
 ## Wardrobe 👕
 
-Every Claude task you finish counts. Outfits unlock automatically, and the pet puts the new one on with a party:
+Every finished task counts. Outfits unlock automatically and the pet puts each new one on with a party:
 
 | Tasks | Unlock |
 |---|---|
 | 3 | 🤓 Nerd glasses |
 | 8 | 🎀 Bow tie |
+| 12 | 👕 Cyborg ERP tee |
 | 15 | 🥳 Party hat |
 | 25 | 😎 Cool shades |
 | 35 | 🌸 Flower |
@@ -29,11 +55,7 @@ Every Claude task you finish counts. Outfits unlock automatically, and the pet p
 | 75 | 👑 Crown |
 | 100 | 🦸 Hero cape |
 
-Right-click → **Wardrobe** to swap items (one per head / face / neck slot). Click a locked item to preview it on your pet.
-
-**Outfit slot:** 👕 Cyborg ERP tee unlocks at 12 tasks.
-
-**Festival collectibles:** keep the pet running during a festival and it collects that festival's outfit for good and greets you ("Happy Diwali, Jai! 🪔"):
+**Festival collectibles:** keep the pet running during a festival and it collects that festival's outfit for good, and greets you ("Happy Diwali, Jai! 🪔"):
 
 | Festival | Items |
 |---|---|
@@ -43,73 +65,25 @@ Right-click → **Wardrobe** to swap items (one per head / face / neck slot). Cl
 | 🎆 New Year | Star glasses |
 | 🇮🇳 15 August / 26 January | Tiranga |
 
-Diwali and Holi dates are listed in `renderer/accessories.js` up to 2029. Add more years there.
-
-**Pets:** Giggles Cat · Cyborg Bot · Bunny · Panda · Dino · Fox · Koala
-
-## Auto-update 🔄
-
-Installed pets update themselves from a release folder. By default this is `<team folder>\giggles-updates`. You can also set a custom folder or an `https://` URL in Settings → Updates.
-
-To publish a new version (from this source folder):
-
-```bash
-npm run release -- patch --notes "New outfits"
-```
-
-Or use Settings → ⚙️ → Updates → **Publish**. This bumps the version, builds the installer and copies it plus `latest.json` (with a SHA-512 checksum) into the release folder. Pets check every 3 hours, download and verify the installer, then install it silently once Claude has been idle for a few minutes and come back on their own. Teammates who are still on 3.0.0 need to install 3.1.0 once by hand; after that, updates are automatic.
+Right-click → **Wardrobe** to swap items. Click a locked item to preview it.
 
 ## Team leaderboard 🏆
 
 1. Right-click → **Team leaderboard** → **Choose team folder**
-2. Pick a folder everyone can reach: shared network drive, a synced OneDrive / SharePoint / Teams folder, or Google Drive
+2. Pick a folder everyone can reach: shared network drive, synced OneDrive / SharePoint / Teams folder, or Google Drive
 3. Every teammate picks the same folder
 
-Each pet writes one small file (`giggles-team/<id>.json`) with name, pet look and task counts. The board shows today / all-time rankings with everyone's pet in its outfit. Your pet tells you when you take #1 ("🏆 You're #1 on the team today!") or when someone passes you.
-
-## Building the installer
-
-```bash
-npm run dist
-```
-
-Output: `dist/Giggles-Pet-Setup-<version>.exe`. You can also use Settings → ⚙️ → **Build installer**. The build compiles `build/pet-hook.cs` into a small native hook with the C# compiler that ships with Windows, so installed machines don't need Node.js. The installer is unsigned, so Windows SmartScreen shows a warning on first run.
-
-## What it does
-
-| When… | The pet… |
-|---|---|
-| Claude is working | types on a laptop with the Cyborg ERP logo; the bubble shows "Editing code…", "Running a command…" |
-| **Claude finishes** | **jumps, confetti, sparkles, chime + giggle: "All done, Jai! 🎉"** |
-| Claude needs permission | hops, waves, "!" badge, yellow bubble |
-| You play music / YouTube / Spotify | puts on headphones 🎧 and grooves to it, showing the song name |
-| You're on a call / using the mic | wears a headset with mic 🎙️ and goes quiet (no sounds) |
-| You open Chrome / Edge | thinks out loud: "🤔 What are we searching, Jai?" |
-| You finish 5/10/20… tasks in a day | trophy message 🏆 |
-| Nothing happens for 4 min | falls asleep 💤 |
-
-**Interactions:** click = tickle 😆 · rub back and forth = pat (hearts + purr) 💕 · click 6× fast = dizzy 😵 · double-click = celebrate · drag = move · right-click = menu
-
-**Fun menu:** feed a snack 🍪 · dance party 💃 · dev jokes 😂 · tips 💡 · walk around mode 🚶
-
-**Pets:** Giggles Cat · Cyborg Bot · Bunny · Panda · Dino
+Shows today / all-time rankings with everyone's pet in its outfit. Only names, pet looks and task counts are shared.
 
 ## Settings
 
-Right-click the pet → **Settings** (or the menu shortcuts):
+Right-click the pet → **Settings**: your name and the pet's name, pet type, size (Tiny → XL), sounds, music/call/browser reactions, walking, notifications, start with Windows, tips, updates.
 
-- Your name and the pet's name
-- Pet type, with live previews
-- Size: Tiny → XL, or the slider (45%–150%)
-- Sounds and volume, music/call/browser reactions, walking, Windows notifications, start with Windows
-- Wellness & coding tips every 15/30/60 minutes
-- Connect / disconnect Claude Code
-- Today's and all-time finished-task count
-- **Create share package**: builds `dist/Giggles-Pet.zip` for teammates
+Settings are saved in `%APPDATA%\Giggles Pet\settings.json`.
 
-Settings are saved per user in `%APPDATA%\Giggles Pet\settings.json`.
+---
 
-## Commands
+## For developers
 
 ```bash
 npm install
@@ -119,35 +93,39 @@ npm install
 npm start
 ```
 
-```bash
-npm run install-hooks
-```
+Test without the assistant: `npm run test-done`, `test-working`, `test-attention`, `test-music`, `test-snack`.
+
+### Releasing a new version
+
+Commit your changes, then:
 
 ```bash
-npm run uninstall-hooks
+npm run release -- patch --notes "New outfits"
 ```
 
-```bash
-npm run share
-```
+This bumps the version, tags it and pushes. The GitHub workflow (`.github/workflows/release.yml`) builds the installer on Windows and publishes it with `latest.json` (SHA-512 checksum) as a release. Every installed pet picks it up within a few hours. Use `minor` for bigger releases. Settings → ⚙️ → Updates → **Publish** does the same.
 
-Test without Claude: `npm run test-done`, `test-working`, `test-attention`, `test-music`, `test-snack`.
+No GitHub? Publish to a shared folder instead with `npm run release -- --folder "\\server\share\giggles-updates"` and set that folder as the update source in Settings.
 
-## How it works
+### How it works
 
 ```
-Claude Code ──hook──▶ hooks/pet-hook.js ──POST 127.0.0.1:47321/event──▶ main.js ──IPC──▶ renderer/pet.js
+Claude Code ──hook──▶ pet-hook (.js / .exe) ──POST 127.0.0.1:47321/event──▶ main.js ──IPC──▶ renderer/pet.js
 system/monitor.ps1 (audio level, mic in use, foreground window) ──stdout──▶ main.js ──▶ renderer/pet.js
 ```
 
-- `main.js`: transparent always-on-top pet window, settings window, local event server (localhost only), settings storage
-- `hooks/pet-hook.js`: forwards only the event name, session id, project folder, tool name and notification text. It never forwards prompts or code. It is silent and always exits 0.
-- `system/monitor.ps1`: reads the speaker peak level (Core Audio), mic usage (Windows privacy registry) and the foreground window title. All of this stays on the machine.
-- `renderer/`: SVG pets (`pet-svg.js`), CSS animations (`pet.css`), behaviour (`pet.js`), WebAudio sounds (`sound.js`), settings UI
-- The installer backs up `~/.claude/settings.json` before adding hooks
+- `main.js`: transparent always-on-top pet window, settings window, local event server (localhost only), settings, updates
+- `hooks/pet-hook.js` / `build/pet-hook.cs`: forward only the event name, session id, project folder, tool name and notification text. They never forward prompts or code.
+- `system/monitor.ps1`: speaker level (Core Audio), mic usage (Windows privacy registry), foreground window title. Everything stays on the machine.
+- `lib/team.js`: shared-folder leaderboard. `lib/updater.js`: update check, download, checksum, silent install.
+- `renderer/`: SVG pets (`pet-svg.js`), animations (`pet.css`), behaviour (`pet.js`), sounds (`sound.js`), wardrobe (`accessories.js`), settings UI
 
-## Options (environment variables)
+### Options (environment variables)
 
 - `GIGGLES_PORT`: local port (default `47321`)
 - `GIGGLES_AUTOLAUNCH=0`: don't let hooks start the pet automatically
 - `GIGGLES_DEBUG=1`: log renderer console output
+
+---
+
+© 2026 Jai Panwar

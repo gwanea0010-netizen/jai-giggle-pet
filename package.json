@@ -2,11 +2,20 @@
   "name": "giggles-pet",
   "productName": "Giggles Pet",
   "version": "3.1.0",
-  "description": "Cyborg ERP desktop pet that reacts to Claude Code: works while Claude works, celebrates when it finishes.",
-  "author": "Cyborg ERP Team",
+  "description": "Giggles Pet: animated Cyborg ERP desktop buddy that works alongside you and celebrates when your coding tasks finish. Developed by Jai Panwar.",
+  "author": {
+    "name": "Jai Panwar",
+    "email": "jaipanwar30@gmail.com"
+  },
+  "homepage": "https://github.com/gwanea0010-netizen/jai-giggle-pet",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gwanea0010-netizen/jai-giggle-pet.git"
+  },
   "license": "UNLICENSED",
   "private": true,
   "main": "main.js",
+  "updateUrl": "https://github.com/gwanea0010-netizen/jai-giggle-pet/releases/latest/download",
   "scripts": {
     "postinstall": "node scripts/setup.js",
     "start": "electron .",
@@ -25,7 +34,7 @@
   "build": {
     "appId": "com.cyborgerp.gigglespet",
     "productName": "Giggles Pet",
-    "copyright": "Cyborg ERP",
+    "copyright": "Copyright © 2026 Jai Panwar",
     "directories": {
       "output": "dist",
       "buildResources": "build"
@@ -53,7 +62,7 @@
     "win": {
       "target": "nsis",
       "icon": "build/icon.png",
-      "artifactName": "Giggles-Pet-Setup-${version}.${ext}"
+      "artifactName": "Giggles-Pet-Setup.${ext}"
     },
     "nsis": {
       "oneClick": true,

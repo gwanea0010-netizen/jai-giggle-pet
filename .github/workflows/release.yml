@@ -1,0 +1,47 @@
+name: Release
+
+# Push a version tag (npm run release does this) -> build the Windows installer
+# on GitHub and publish it as a release. Installed pets update from here.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Check tag matches package.json
+        shell: bash
+        run: |
+          PKG="v$(node -p "require('./package.json').version")"
+          if [ "$PKG" != "$GITHUB_REF_NAME" ]; then
+            echo "Tag $GITHUB_REF_NAME does not match package.json version $PKG"
+            exit 1
+          fi
+
+      - run: npm ci
+
+      - name: Build installer
+        run: npm run dist
+
+      - name: Write latest.json
+        shell: bash
+        run: node scripts/manifest.js "$(git log -1 --format=%s)"
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          name: Giggles Pet ${{ github.ref_name }}
+          generate_release_notes: true
+          files: |
+            dist/Giggles-Pet-Setup.exe
+            dist/latest.json
