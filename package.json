@@ -23,7 +23,7 @@
     "uninstall-hooks": "node scripts/install-hooks.js --remove",
     "share": "node scripts/share.js",
     "build-hook": "node scripts/build-hook.js",
-    "dist": "node scripts/build-hook.js && electron-builder --win nsis",
+    "dist": "node scripts/build-hook.js && electron-builder --win nsis --publish never",
     "test-done": "node scripts/send.js done",
     "test-working": "node scripts/send.js working",
     "test-attention": "node scripts/send.js attention",
