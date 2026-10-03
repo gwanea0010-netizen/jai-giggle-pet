@@ -67,8 +67,8 @@ public static class PetSys {
       uint pid;
       GetWindowThreadProcessId(h, out pid);
       string name = Process.GetProcessById((int)pid).ProcessName;
-      return new string[] { name, sb.ToString() };
-    } catch { return new string[] { "", "" }; }
+      return new string[] { name, sb.ToString(), h.ToInt64().ToString() };
+    } catch { return new string[] { "", "", "0" }; }
   }
 }
 "@
@@ -87,12 +87,37 @@ function Test-MicInUse {
   return $false
 }
 
+# Address bar of the foreground Chrome/Edge window, only when the pet asks for it
+# (GIGGLES_WANT_URL=1 while the password vault is unlocked). Read via UI Automation.
+$wantUrl = $env:GIGGLES_WANT_URL -eq '1'
+if ($wantUrl) { Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes }
+$urlCache = @{ hwnd = '0'; el = $null }
+function Get-BrowserUrl([string]$hwnd) {
+  try {
+    if ($urlCache.hwnd -ne $hwnd -or -not $urlCache.el) {
+      $root = [System.Windows.Automation.AutomationElement]::FromHandle([IntPtr][long]$hwnd)
+      $cond = New-Object System.Windows.Automation.PropertyCondition(
+        [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
+        [System.Windows.Automation.ControlType]::Edit)
+      $urlCache.el = $root.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $cond)
+      $urlCache.hwnd = $hwnd
+    }
+    if ($urlCache.el) {
+      $vp = $urlCache.el.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern)
+      return [string]$vp.Current.Value
+    }
+  } catch { $urlCache.el = $null }
+  return ''
+}
+
 $tick = 0
 $media = ''
 while ($true) {
   $peak = [PetSys]::Peak()
   $fg = [PetSys]::Foreground()
   $mic = Test-MicInUse
+  $url = ''
+  if ($wantUrl -and @('chrome', 'msedge') -contains $fg[0].ToLower()) { $url = Get-BrowserUrl $fg[2] }
 
   if ($tick % 3 -eq 0) {
     $media = ''
@@ -104,7 +129,7 @@ while ($true) {
     }
   }
 
-  $line = @{ peak = [math]::Round($peak, 3); mic = $mic; fgProc = $fg[0]; fgTitle = $fg[1]; media = $media } | ConvertTo-Json -Compress
+  $line = @{ peak = [math]::Round($peak, 3); mic = $mic; fgProc = $fg[0]; fgTitle = $fg[1]; media = $media; url = $url } | ConvertTo-Json -Compress
   [Console]::Out.WriteLine($line)
   [Console]::Out.Flush()
   $tick++

@@ -49,6 +49,8 @@ contextBridge.exposeInMainWorld('pet', {
     generate: (len) => ipcRenderer.invoke('vault:generate', len),
     copy: (id, field) => ipcRenderer.invoke('vault:copy', id, field),
     onLocked: on('vault-locked'),
+    onState: on('vault-state'),
+    onMatch: on('vault-match'),
   },
   openVault: () => ipcRenderer.send('open-vault'),
   onUpdateState: on('update-state'),

@@ -45,6 +45,7 @@ input[type="password"]:focus, textarea:focus { border-color: var(--blue); box-sh
 .entries .acts { display: flex; gap: 6px; }
 .entries .acts button { padding: 6px 9px; }
 
+.options { display: grid; gap: 12px; }
 .master summary { cursor: pointer; font-weight: 600; }
 .master[open] { display: grid; gap: 10px; }
 .end { align-items: center; }

@@ -51,6 +51,19 @@
       </div>
       <ul class="entries" id="entries"></ul>
       <p class="hint center" id="empty-hint">Nothing saved yet. Add your first password or note.</p>
+      <div class="card options">
+        <label class="field">
+          <span>Lock the vault</span>
+          <select id="opt-autolock">
+            <option value="manual">Only when I press Lock (or the PC restarts)</option>
+            <option value="winlock">When I lock Windows (Win+L) or the PC sleeps</option>
+            <option value="5">After 5 minutes idle</option>
+            <option value="15">After 15 minutes idle</option>
+            <option value="60">After 1 hour idle</option>
+          </select>
+        </label>
+        <label class="check"><input type="checkbox" id="opt-hints" /> <span>When a saved website is open in Chrome or Edge, show its login on the pet (username + copy password; the password stays hidden)</span></label>
+      </div>
       <details class="card master">
         <summary>Change master password</summary>
         <p class="hint">⚠️ Save the new master password somewhere safe first. If you forget it, your data cannot be recovered.</p>
@@ -75,7 +88,7 @@
           </div>
         </label>
         <div class="meter"><div id="e-meter"></div></div>
-        <label class="field"><span>Website / server</span><input id="e-url" autocomplete="off" /></label>
+        <label class="field"><span>Website / server (the pet shows this login when the site is open)</span><input id="e-url" placeholder="e.g. workhub.cyborgerp.com" autocomplete="off" /></label>
       </div>
       <label class="field"><span>Notes</span><textarea id="e-notes" rows="6"></textarea></label>
       <p class="error" id="edit-error"></p>
@@ -89,7 +102,7 @@
   </main>
 
   <div class="toast" id="toast"></div>
-  <footer>🔐 AES-256 encrypted · auto-locks after 5 minutes · Developed by <b>Jai Panwar</b></footer>
+  <footer>🔐 AES-256 encrypted · stored only on this PC · Developed by <b>Jai Panwar</b></footer>
   <script src="vault.js"></script>
 </body>
 </html>

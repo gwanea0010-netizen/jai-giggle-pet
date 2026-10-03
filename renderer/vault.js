@@ -191,6 +191,20 @@
     show('list');
   });
 
+  // ---------- options ----------
+  window.pet.getSettings().then((s) => {
+    $('opt-autolock').value = s.vaultAutoLock || 'manual';
+    $('opt-hints').checked = s.vaultHints !== false;
+  });
+  $('opt-autolock').addEventListener('change', async () => {
+    await window.pet.setSettings({ vaultAutoLock: $('opt-autolock').value });
+    toast('✅ Saved');
+  });
+  $('opt-hints').addEventListener('change', async () => {
+    await window.pet.setSettings({ vaultHints: $('opt-hints').checked });
+    toast($('opt-hints').checked ? '✅ Logins will show on the pet' : '✅ Turned off');
+  });
+
   // ---------- change master password ----------
   $('cm-btn').addEventListener('click', async () => {
     const r = await V.changeMaster($('cm-old').value, $('cm-new').value);

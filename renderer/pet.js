@@ -524,6 +524,56 @@
     }
   });
 
+  // ---------- vault: saved logins for the site open in Chrome/Edge ----------
+  let vaultBubble = false;
+  window.pet.vault.onMatch(({ host, items = [] }) => {
+    if (!items.length) {
+      if (vaultBubble) hideBubble();
+      vaultBubble = false;
+      return;
+    }
+    if (['fly', 'aim'].includes(state)) return;
+    vaultBubble = true;
+    const rows = items.map((e) => `
+      <div class="vrow">
+        <div class="vtitle">🔑 ${esc(e.title)}</div>
+        ${e.username ? `<div class="vline"><span class="vval">${esc(e.username)}</span><button data-vcopy="username" data-id="${esc(e.id)}">👤 Copy</button></div>` : ''}
+        ${e.hasPassword ? `<div class="vline"><span class="vval vmask">••••••••••</span><button data-vcopy="password" data-id="${esc(e.id)}">📋 Copy</button></div>` : ''}
+      </div>`).join('');
+    if (state === 'idle' || state === 'music') setLook('happy', 'smile');
+    showBubble(rows, { sub: `🔐 Saved login · ${host}`, cls: 'vault-bubble', html: true, ms: 30000 });
+    play('pop');
+  });
+
+  // Copy buttons inside the bubble (the password itself never reaches this window).
+  bubble.addEventListener('click', async (e) => {
+    const copyBtn = e.target.closest('[data-vcopy]');
+    if (copyBtn) {
+      const field = copyBtn.dataset.vcopy;
+      const r = await window.pet.vault.copy(copyBtn.dataset.id, field);
+      copyBtn.textContent = r.ok ? '✓ Copied' : '🔒 Locked';
+      if (r.ok && field === 'password') bubbleSub.textContent = '📋 Password copied · clears in 20s';
+      lastActivity = Date.now();
+      return;
+    }
+    if (e.target.closest('[data-vunlock]')) {
+      hideBubble();
+      window.pet.openVault();
+    }
+  });
+
+  // At startup (e.g. after Windows starts) offer to unlock the vault so saved logins work.
+  async function offerVaultUnlock() {
+    const st = await window.pet.vault.status();
+    if (!st.exists || st.unlocked || state !== 'idle') return;
+    showBubble('<div class="vline"><span>Unlock your vault to see saved logins in Chrome/Edge</span></div><button class="vbig" data-vunlock="1">🔓 Unlock vault</button>', {
+      sub: '🔐 Password vault',
+      cls: 'vault-bubble',
+      html: true,
+      ms: 15000,
+    });
+  }
+
   // ---------- settings ----------
   let previewTimer = null;
   function applyWardrobe(eq = S.equipped || {}) {
@@ -1051,5 +1101,6 @@
     booted = true;
     scheduleBlink();
     goHello();
+    setTimeout(offerVaultUnlock, 5000);
   });
 })();

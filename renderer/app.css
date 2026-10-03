@@ -78,6 +78,19 @@ html, body {
 #bubble.attention { background: #fff6cf; }
 #bubble.music { background: #efeaff; }
 #bubble.tip { background: #e9f8ee; }
+#bubble.vault-bubble { background: #eef3ff; max-width: 262px; text-align: left; font-size: 12.5px; }
+#bubble.vault-bubble::after { background: #eef3ff; }
+.vrow + .vrow { margin-top: 8px; padding-top: 8px; border-top: 1px dashed #b9c6e6; }
+.vtitle { font-weight: 800; margin-bottom: 4px; }
+.vline { display: flex; align-items: center; gap: 6px; margin-top: 3px; font-weight: 600; }
+.vval { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vmask { letter-spacing: 2px; }
+#bubble button {
+  font: 700 11px "Segoe UI", sans-serif; padding: 3px 8px; border-radius: 8px; cursor: pointer;
+  border: 1.5px solid #1d3f91; background: #1d3f91; color: #fff; white-space: nowrap;
+}
+#bubble button:hover { background: #22a83a; border-color: #22a83a; }
+#bubble .vbig { display: block; width: 100%; margin-top: 8px; padding: 6px; font-size: 12px; }
 #bubble.code { max-width: 262px; text-align: left; font-size: 12px; }
 #bubble.code #bubble-text { white-space: pre-line; }
 

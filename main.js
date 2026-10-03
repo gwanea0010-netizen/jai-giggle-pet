@@ -78,8 +78,11 @@ const DEFAULTS = {
   updateSource: '',
   autoUpdate: true,
   codeHelper: true,
+  vaultAutoLock: 'manual', // 'manual' | 'winlock' | '5' | '15' | '60'
+  vaultHints: true, // show saved logins when their site is open in Chrome/Edge
 };
-const EDITABLE = ['ownerName', 'petName', 'species', 'scale', 'sound', 'volume', 'notifications', 'roam', 'media', 'tipsEvery', 'startWithWindows', 'teamFolder', 'updateSource', 'autoUpdate', 'codeHelper'];
+const VAULT_LOCK_OPTIONS = ['manual', 'winlock', '5', '15', '60'];
+const EDITABLE = ['ownerName', 'petName', 'species', 'scale', 'sound', 'volume', 'notifications', 'roam', 'media', 'tipsEvery', 'startWithWindows', 'teamFolder', 'updateSource', 'autoUpdate', 'codeHelper', 'vaultAutoLock', 'vaultHints'];
 const PUBLIC_KEYS = ['ownerName', 'petName', 'species', 'equipped', 'teamFolder'];
 
 let settings = { ...DEFAULTS };
@@ -140,6 +143,7 @@ function sanitize(patch) {
     }
     out.equipped = eq;
   }
+  if ('vaultAutoLock' in out && !VAULT_LOCK_OPTIONS.includes(out.vaultAutoLock)) delete out.vaultAutoLock;
   if ('scale' in out) out.scale = Math.min(1.5, Math.max(0.45, out.scale));
   if ('volume' in out) out.volume = Math.min(1, Math.max(0, out.volume));
   if ('species' in out && !SPECIES.some((s) => s.id === out.species)) delete out.species;
@@ -156,6 +160,8 @@ function updateSettings(patch) {
   if (settings.media !== prev.media || settings.codeHelper !== prev.codeHelper) {
     settings.media || settings.codeHelper ? startMonitor() : stopMonitor();
   }
+  if (settings.vaultHints !== prev.vaultHints) restartMonitorForUrl();
+  if (settings.vaultAutoLock !== prev.vaultAutoLock) touchVault();
   saveSettings();
   broadcast('settings', clean);
   if (settingsWin && !settingsWin.isDestroyed()) settingsWin.webContents.send('settings', settings);
@@ -470,6 +476,9 @@ function handleHookEvent(evt) {
     case 'vault':
       openVault();
       break;
+    case 'site-test': // debug builds only: simulate the browser being on a URL
+      if (process.env.GIGGLES_DEBUG) matchVaultSite(evt.detail);
+      break;
     default:
       // manual / test states (scripts/send.js)
       if (['done', 'working', 'attention', 'hello', 'sleep', 'snack', 'dance', 'joke', 'tip', 'quote', 'codetest', 'music', 'call', 'preview', 'festival'].includes(name)) {
@@ -551,12 +560,28 @@ function watchClipboard(proc) {
   if (text.length >= 12 && text.length <= 20000) broadcast('code-clip', { text, app: proc });
 }
 
+// The browser address bar is only read while the vault is unlocked (to show saved logins).
+const urlWanted = () => !!(vault && vault.isUnlocked() && settings.vaultHints);
+const needMonitor = () => settings.media || settings.codeHelper || urlWanted();
+let monitorWantsUrl = false;
+
+function restartMonitorForUrl() {
+  if (monitor && monitorWantsUrl === urlWanted()) return;
+  stopMonitor();
+  startMonitor();
+  if (!urlWanted()) broadcast('vault-match', { items: [] });
+}
+
 function startMonitor() {
-  if (process.platform !== 'win32' || monitor || !(settings.media || settings.codeHelper)) return;
+  if (process.platform !== 'win32' || monitor || !needMonitor()) return;
   lastClip = null;
   // PowerShell can't read inside app.asar, so the script is unpacked next to it.
   const script = path.join(__dirname, 'system', 'monitor.ps1').replace(`app.asar${path.sep}`, `app.asar.unpacked${path.sep}`);
-  monitor = spawn('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', script], { windowsHide: true });
+  monitorWantsUrl = urlWanted();
+  monitor = spawn('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', script], {
+    windowsHide: true,
+    env: { ...process.env, GIGGLES_WANT_URL: monitorWantsUrl ? '1' : '0' },
+  });
   readline.createInterface({ input: monitor.stdout }).on('line', (line) => {
     let data;
     try {
@@ -564,12 +589,18 @@ function startMonitor() {
     } catch {
       return; // partial line
     }
-    broadcast('system', data);
-    watchClipboard(String(data.fgProc || '').toLowerCase());
+    const { url, ...rest } = data;
+    broadcast('system', rest); // the URL itself never goes to the pet window
+    const proc = String(data.fgProc || '').toLowerCase();
+    watchClipboard(proc);
+    // Clicking the pet's Copy buttons makes the pet the foreground app; keep the bubble.
+    if (proc !== OWN_PROCESS) matchVaultSite(url);
   });
+  const me = monitor;
   monitor.on('exit', () => {
+    if (monitor !== me) return; // an older monitor we replaced on purpose
     monitor = null;
-    if ((settings.media || settings.codeHelper) && !app.isQuitting) {
+    if (needMonitor() && !app.isQuitting) {
       clearTimeout(monitorRestart);
       monitorRestart = setTimeout(startMonitor, 5000);
     }
@@ -579,9 +610,33 @@ function startMonitor() {
 function stopMonitor() {
   clearTimeout(monitorRestart);
   if (monitor) {
-    monitor.kill();
-    monitor = null;
+    const m = monitor;
+    monitor = null; // set first so the exit handler doesn't auto-restart it
+    m.kill();
   }
+}
+
+// ---------- saved logins for the open site ----------
+function hostOf(u) {
+  const s = String(u || '').trim();
+  if (!s || /\s/.test(s)) return '';
+  try {
+    return new URL(/^[a-z][\w+.-]*:\/\//i.test(s) ? s : `http://${s}`).host.toLowerCase().replace(/^www\./, '');
+  } catch {
+    return '';
+  }
+}
+
+let lastSiteHost = '';
+const OWN_PROCESS = path.parse(process.execPath).name.toLowerCase(); // "electron" or "giggles pet"
+function matchVaultSite(url) {
+  const host = urlWanted() ? hostOf(url) : '';
+  if (host === lastSiteHost) return;
+  lastSiteHost = host;
+  if (!host) return broadcast('vault-match', { items: [] });
+  // same host, or a subdomain of the saved host (saved "cyborgerp.com" matches "workhub.cyborgerp.com")
+  const items = getVault().entriesForHost((saved) => host === saved || host.endsWith(`.${saved}`), hostOf);
+  broadcast('vault-match', { host, items });
 }
 
 // ---------- walking ----------
@@ -914,15 +969,25 @@ function getVault() {
   return vault;
 }
 
+// Idle auto-lock only if the user picked one; by default the vault stays open
+// until the Lock button or the app/PC restarts (the key only lives in memory).
 function touchVault() {
   clearTimeout(vaultLockTimer);
-  if (getVault().isUnlocked()) vaultLockTimer = setTimeout(lockVault, VAULT_IDLE_MS);
+  const minutes = Number(settings.vaultAutoLock);
+  if (getVault().isUnlocked() && minutes > 0) vaultLockTimer = setTimeout(lockVault, minutes * 60 * 1000);
+}
+
+function vaultChanged() {
+  broadcast('vault-state', vaultStatus());
+  restartMonitorForUrl();
 }
 
 function lockVault() {
   clearTimeout(vaultLockTimer);
+  const wasUnlocked = getVault().isUnlocked();
   getVault().lock();
   if (vaultWin && !vaultWin.isDestroyed()) vaultWin.webContents.send('vault-locked');
+  if (wasUnlocked && !app.isQuitting) vaultChanged();
 }
 
 function vaultStatus() {
@@ -954,8 +1019,7 @@ function openVault() {
   });
   vaultWin.loadFile(path.join(__dirname, 'renderer', 'vault.html'));
   vaultWin.on('closed', () => {
-    vaultWin = null;
-    lockVault(); // closing the window always locks
+    vaultWin = null; // stays unlocked; lock with the Lock button (or per the auto-lock setting)
   });
   broadcast('pet-event', { state: 'vault' });
 }
@@ -972,13 +1036,15 @@ const vaultCall = (fn) => async (_e, ...args) => {
 };
 
 ipcMain.handle('vault:status', () => vaultStatus());
-ipcMain.handle('vault:create', vaultCall((pw) => { getVault().create(pw); return vaultStatus(); }));
-ipcMain.handle('vault:unlock', vaultCall((pw) => { getVault().unlock(pw); return vaultStatus(); }));
+ipcMain.on('vault:open-unlock', () => openVault());
+ipcMain.handle('vault:create', vaultCall((pw) => { getVault().create(pw); vaultChanged(); return vaultStatus(); }));
+ipcMain.handle('vault:unlock', vaultCall((pw) => { getVault().unlock(pw); vaultChanged(); return vaultStatus(); }));
 ipcMain.handle('vault:lock', () => { lockVault(); return vaultStatus(); });
 ipcMain.handle('vault:list', vaultCall(() => getVault().list()));
 ipcMain.handle('vault:get', vaultCall((id) => getVault().get(id)));
-ipcMain.handle('vault:save', vaultCall((entry) => getVault().upsert(entry || {})));
-ipcMain.handle('vault:delete', vaultCall((id) => getVault().remove(id)));
+// After edits, re-check the open site so a newly saved login shows up right away.
+ipcMain.handle('vault:save', vaultCall((entry) => { const id = getVault().upsert(entry || {}); lastSiteHost = '\0'; return id; }));
+ipcMain.handle('vault:delete', vaultCall((id) => { getVault().remove(id); lastSiteHost = '\0'; }));
 ipcMain.handle('vault:change-master', vaultCall((oldPw, newPw) => getVault().changeMaster(oldPw, newPw)));
 ipcMain.handle('vault:generate', (_e, len) => generatePassword(Math.min(64, Math.max(8, Number(len) || 18))));
 // Copies a field to the clipboard and wipes it after 20s (if it's still there).
@@ -1012,8 +1078,9 @@ app.whenReady().then(() => {
   if (process.platform === 'win32') app.setAppUserModelId('Giggles Pet');
   // Locking Windows (Win+L) or sleeping locks the vault too.
   const { powerMonitor } = require('electron');
-  powerMonitor.on('lock-screen', () => vault && lockVault());
-  powerMonitor.on('suspend', () => vault && lockVault());
+  const lockOnWindowsLock = () => vault && settings.vaultAutoLock !== 'manual' && lockVault();
+  powerMonitor.on('lock-screen', lockOnWindowsLock);
+  powerMonitor.on('suspend', lockOnWindowsLock);
   loadSettings();
   // Installed app: start with Windows by default (first run), and keep the startup entry
   // pointing at the current exe so the pet comes back after reboots and updates.
