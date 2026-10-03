@@ -20,7 +20,7 @@
     { id: 'santa', slot: 'head', name: 'Santa hat', emoji: '🎅', festival: 'christmas' },
     { id: 'gift', slot: 'prop', name: 'Gift box', emoji: '🎁', festival: 'christmas' },
     { id: 'stars', slot: 'face', name: 'Star glasses', emoji: '✨', festival: 'newyear' },
-    { id: 'flag', slot: 'prop', name: 'Tiranga', emoji: '🇮🇳', festival: 'india' },
+    { id: 'flag', slot: 'prop', name: 'Tiranga', emoji: '🚩', festival: 'india' }, // flag emoji don't render on Windows
   ];
 
   const SLOTS = { head: 'Head', face: 'Face', body: 'Outfit', neck: 'Neck & back', prop: 'Props' };
@@ -31,7 +31,7 @@
     { id: 'holi', name: 'Holi', emoji: '🎨', greet: 'Happy Holi', dates: ['2026-03-04', '2027-03-22', '2028-03-11', '2029-03-01'], before: 2, after: 2 },
     { id: 'christmas', name: 'Christmas', emoji: '🎄', greet: 'Merry Christmas', md: ['12-25'], before: 6, after: 6 },
     { id: 'newyear', name: 'New Year', emoji: '🎆', greet: 'Happy New Year', md: ['01-01'], before: 1, after: 3 },
-    { id: 'india', name: 'Independence & Republic Day', emoji: '🇮🇳', greet: 'Jai Hind', md: ['08-15', '01-26'], before: 1, after: 1 },
+    { id: 'india', name: 'Independence & Republic Day', emoji: '🪁', greet: 'Jai Hind', md: ['08-15', '01-26'], before: 1, after: 1 },
   ];
 
   const DAY = 24 * 60 * 60 * 1000;
