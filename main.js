@@ -2,7 +2,7 @@
 // Main process: transparent pet window, settings window, local event server,
 // system monitor (music / mic / foreground app) and persisted settings.
 
-const { app, BrowserWindow, ipcMain, screen, Menu, Notification, nativeImage, dialog, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, screen, Menu, Notification, nativeImage, dialog, shell, clipboard } = require('electron');
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
@@ -75,17 +75,26 @@ const DEFAULTS = {
   hooksWanted: true,
   updateSource: '',
   autoUpdate: true,
+  codeHelper: true,
 };
-const EDITABLE = ['ownerName', 'petName', 'species', 'scale', 'sound', 'volume', 'notifications', 'roam', 'media', 'tipsEvery', 'startWithWindows', 'teamFolder', 'updateSource', 'autoUpdate'];
+const EDITABLE = ['ownerName', 'petName', 'species', 'scale', 'sound', 'volume', 'notifications', 'roam', 'media', 'tipsEvery', 'startWithWindows', 'teamFolder', 'updateSource', 'autoUpdate', 'codeHelper'];
 const PUBLIC_KEYS = ['ownerName', 'petName', 'species', 'equipped', 'teamFolder'];
 
 let settings = { ...DEFAULTS };
 const settingsFile = () => path.join(app.getPath('userData'), 'settings.json');
 
 function loadSettings() {
+  let raw = null;
   try {
-    settings = { ...DEFAULTS, ...JSON.parse(fs.readFileSync(settingsFile(), 'utf8')) };
+    raw = fs.readFileSync(settingsFile(), 'utf8');
   } catch {
+    // first run
+  }
+  try {
+    settings = { ...DEFAULTS, ...(raw ? JSON.parse(raw.replace(/^﻿/, '')) : {}) };
+  } catch {
+    // Unreadable file: keep a copy instead of silently losing the user's pet.
+    try { fs.copyFileSync(settingsFile(), `${settingsFile()}.broken-${Date.now()}`); } catch { /* ignore */ }
     settings = { ...DEFAULTS };
   }
   settings.stats = { ...DEFAULTS.stats, ...settings.stats };
@@ -142,7 +151,9 @@ function updateSettings(patch) {
   settings = { ...settings, ...clean };
   if (settings.scale !== prev.scale) applyScale();
   if (settings.startWithWindows !== prev.startWithWindows) applyLoginItem();
-  if (settings.media !== prev.media) (settings.media ? startMonitor() : stopMonitor());
+  if (settings.media !== prev.media || settings.codeHelper !== prev.codeHelper) {
+    settings.media || settings.codeHelper ? startMonitor() : stopMonitor();
+  }
   saveSettings();
   broadcast('settings', clean);
   if (settingsWin && !settingsWin.isDestroyed()) settingsWin.webContents.send('settings', settings);
@@ -431,7 +442,7 @@ function handleHookEvent(evt) {
       break;
     default:
       // manual / test states (scripts/send.js)
-      if (['done', 'working', 'attention', 'hello', 'sleep', 'snack', 'dance', 'joke', 'tip', 'quote', 'music', 'call', 'preview', 'festival'].includes(name)) {
+      if (['done', 'working', 'attention', 'hello', 'sleep', 'snack', 'dance', 'joke', 'tip', 'quote', 'codetest', 'music', 'call', 'preview', 'festival'].includes(name)) {
         broadcast('pet-event', { state: name, project, session, detail: evt.detail, sub: evt.sub });
       }
   }
@@ -492,21 +503,43 @@ function startServer() {
 let monitor = null;
 let monitorRestart = null;
 
+// Code editors / SQL tools where the pet reviews what you copy.
+const CODE_APPS = ['ssms', 'devenv', 'azuredatastudio', 'code', 'dbeaver', 'datagrip64', 'rider64'];
+let lastClip = null;
+
+function watchClipboard(proc) {
+  if (!settings.codeHelper || !CODE_APPS.includes(proc)) return;
+  let text = '';
+  try {
+    text = clipboard.readText();
+  } catch {
+    return;
+  }
+  if (lastClip === null) lastClip = text; // ignore whatever was copied before we started watching
+  if (!text || text === lastClip) return;
+  lastClip = text;
+  if (text.length >= 12 && text.length <= 20000) broadcast('code-clip', { text, app: proc });
+}
+
 function startMonitor() {
-  if (process.platform !== 'win32' || monitor || !settings.media) return;
+  if (process.platform !== 'win32' || monitor || !(settings.media || settings.codeHelper)) return;
+  lastClip = null;
   // PowerShell can't read inside app.asar, so the script is unpacked next to it.
   const script = path.join(__dirname, 'system', 'monitor.ps1').replace(`app.asar${path.sep}`, `app.asar.unpacked${path.sep}`);
   monitor = spawn('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', script], { windowsHide: true });
   readline.createInterface({ input: monitor.stdout }).on('line', (line) => {
+    let data;
     try {
-      broadcast('system', JSON.parse(line));
+      data = JSON.parse(line);
     } catch {
-      // ignore partial lines
+      return; // partial line
     }
+    broadcast('system', data);
+    watchClipboard(String(data.fgProc || '').toLowerCase());
   });
   monitor.on('exit', () => {
     monitor = null;
-    if (settings.media && !app.isQuitting) {
+    if ((settings.media || settings.codeHelper) && !app.isQuitting) {
       clearTimeout(monitorRestart);
       monitorRestart = setTimeout(startMonitor, 5000);
     }
@@ -657,7 +690,38 @@ ipcMain.on('move-by', (_e, { dx, dy }) => {
   const [x, y] = win.getPosition();
   win.setPosition(Math.round(x + dx), Math.round(y + dy));
 });
-ipcMain.on('drag-end', savePosition);
+// Drag follows the real cursor position (no accumulated deltas), so the pet
+// stays glued under the mouse even on scaled / mixed-DPI monitors.
+let dragTimer = null;
+ipcMain.on('drag-start', () => {
+  if (!win) return;
+  stopWalk();
+  if (flyTimer) {
+    // caught mid-air
+    clearInterval(flyTimer);
+    flyTimer = null;
+    broadcast('fly-done', {});
+  }
+  const c = screen.getCursorScreenPoint();
+  const b = win.getBounds();
+  const size = petSize(settings.scale);
+  const offset = { dx: c.x - b.x, dy: c.y - b.y };
+  clearInterval(dragTimer);
+  dragTimer = setInterval(() => {
+    const p = screen.getCursorScreenPoint();
+    const x = p.x - offset.dx;
+    const y = p.y - offset.dy;
+    const cur = win.getBounds();
+    if (cur.x !== x || cur.y !== y || cur.width !== size.w || cur.height !== size.h) {
+      win.setBounds({ x, y, width: size.w, height: size.h });
+    }
+  }, 8);
+});
+ipcMain.on('drag-end', () => {
+  clearInterval(dragTimer);
+  dragTimer = null;
+  savePosition();
+});
 
 ipcMain.handle('settings:get', () => settings);
 ipcMain.handle('settings:set', (_e, patch) => {

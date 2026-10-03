@@ -2,6 +2,7 @@
 (function (root) {
   const SPECIES = [
     { id: 'cat', name: 'Giggles Cat', blurb: 'The original giggler' },
+    { id: 'cyborgai', name: 'Cyborg AI', blurb: 'Official Cyborg ERP bot' },
     { id: 'robot', name: 'Cyborg Bot', blurb: 'Cyborg ERP edition' },
     { id: 'bunny', name: 'Bunny', blurb: 'Hops when happy' },
     { id: 'panda', name: 'Panda', blurb: 'Chill & cuddly' },

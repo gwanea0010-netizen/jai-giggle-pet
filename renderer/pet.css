@@ -31,6 +31,13 @@
   --belly: #eaf8c8; --accent: #ffb347; --blush: #ff8f8f;
 }
 
+.pet[data-species="cyborgai"] {
+  --body: #e8eef8; --body-light: #ffffff; --rim: #aebbd3;
+  --limb: #1d3f91; --limb-light: #3f6fd1;
+  --belly: #f4f7fc; --blush: #4ff3ff;
+  --eye-ink: #4ff3ff; --mouth-ink: #4ff3ff;
+  --phones: #22a83a;
+}
 .pet[data-species="fox"] {
   --body: #ff8a3d; --body-light: #ffbb80; --rim: #e2661f;
   --limb: #4a3232; --limb-light: #6e4a4a;
@@ -50,7 +57,37 @@
 .pet[data-species="panda"] .sp-panda,
 .pet[data-species="dino"] .sp-dino,
 .pet[data-species="fox"] .sp-fox,
-.pet[data-species="koala"] .sp-koala { display: inline; }
+.pet[data-species="koala"] .sp-koala,
+.pet[data-species="cyborgai"] .sp-cyborgai { display: inline; }
+
+/* Cyborg AI */
+.pet[data-species="cyborgai"] .p-belly { display: none; }
+.pet[data-species="cyborgai"] .p-eye-white { fill: #06122e; }
+.pet[data-species="cyborgai"] .p-iris { fill: #4ff3ff; filter: drop-shadow(0 0 2.5px #4ff3ff); }
+.pet[data-species="cyborgai"] .p-blush { opacity: .35; }
+.p-ai-antenna { stroke: #8fa3c8; stroke-width: 3.5; stroke-linecap: round; }
+.p-ai-halo { fill: none; stroke: #4ff3ff; stroke-width: 2; opacity: .8; transform-box: fill-box; transform-origin: center; animation: halo 2.4s ease-in-out infinite; }
+.p-ai-core { fill: #22a83a; stroke: #fff; stroke-width: 1.5; animation: bulb 1.4s ease-in-out infinite alternate; }
+.p-ai-pod { fill: #1d3f91; stroke: #102a66; stroke-width: 2; }
+.p-ai-glow { fill: #4ff3ff; animation: bulb 1.8s ease-in-out infinite alternate; }
+.p-ai-visor { stroke: #4f7fd8; stroke-width: 2; }
+.p-ai-visor-shine { fill: none; stroke: #fff; stroke-width: 2.5; stroke-linecap: round; opacity: .25; }
+.p-ai-chest { fill: #ffffff; stroke: #4ff3ff; stroke-width: 2.5; filter: drop-shadow(0 0 3px #4ff3ff); }
+.p-ai-banner { fill: #1d3f91; stroke: #102a66; stroke-width: 1.2; }
+.p-ai-banner-tail { fill: #163a80; }
+.p-ai-banner-text { font: 800 8.5px "Segoe UI", sans-serif; fill: #fff; letter-spacing: 1.2px; }
+.p-ai-pole { stroke: #8a8f9c; stroke-width: 3; stroke-linecap: round; }
+.p-ai-pole-tip { fill: #ffc83d; }
+.p-ai-flag { transform-box: fill-box; transform-origin: 0 50%; animation: flagWave 1.6s ease-in-out infinite; }
+.p-ai-flag-cloth { fill: #1d3f91; stroke: #102a66; stroke-width: 1.2; }
+.p-ai-flag .p-logo .lg-a { stroke: #b8c8ff; }
+.p-ai-flag-text { font: 800 6px "Segoe UI", sans-serif; fill: #fff; letter-spacing: .6px; }
+.p-ai-hand { stroke: #102a66; stroke-width: 1; }
+/* the laptop sits where the banner is, so hide the banner while working */
+.pet[data-species="cyborgai"].s-working .p-ai-banner,
+.pet[data-species="cyborgai"].s-working .p-ai-banner-tail,
+.pet[data-species="cyborgai"].s-working .p-ai-banner-text { opacity: 0; }
+@keyframes halo { 0%, 100% { transform: scaleX(1); opacity: .8; } 50% { transform: scaleX(.75); opacity: .45; } }
 
 .p-tail { fill: var(--body); stroke: var(--rim); stroke-width: 1.5; transform-origin: 140px 150px; animation: tailWag 2.6s ease-in-out infinite; }
 .p-tail-tip { fill: #fff4ea; }

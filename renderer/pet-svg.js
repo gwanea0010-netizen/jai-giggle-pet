@@ -33,6 +33,10 @@
       <stop offset="0%" style="stop-color:var(--limb-light)"/>
       <stop offset="100%" style="stop-color:var(--limb)"/>
     </radialGradient>
+    <linearGradient id="${id('visor')}" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1b3a7a"/>
+      <stop offset="1" stop-color="#050b1f"/>
+    </linearGradient>
     <filter id="${id('soft')}" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="4"/></filter>
     <filter id="${id('blur')}" x="-30%" y="-200%" width="160%" height="500%"><feGaussianBlur stdDeviation="2.5"/></filter>
   </defs>
@@ -83,6 +87,11 @@
         <circle class="p-ear-in" cx="56" cy="86" r="14"/>
         <circle class="p-ear-in" cx="144" cy="86" r="14"/>
       </g>
+      <g class="sp sp-cyborgai">
+        <line x1="100" y1="64" x2="100" y2="40" class="p-ai-antenna"/>
+        <ellipse cx="100" cy="34" rx="15" ry="4.5" class="p-ai-halo"/>
+        <circle cx="100" cy="34" r="6" class="p-ai-core"/>
+      </g>
       <g class="sp sp-robot">
         <line x1="100" y1="66" x2="100" y2="42" class="p-antenna"/>
         <circle cx="100" cy="36" r="7" class="p-bulb"/>
@@ -102,6 +111,20 @@
       <circle class="p-bolt" cx="37" cy="112" r="9"/><circle class="p-bolt-in" cx="37" cy="112" r="4"/>
       <circle class="p-bolt" cx="163" cy="112" r="9"/><circle class="p-bolt-in" cx="163" cy="112" r="4"/>
       ${logo(100, 148, 1.5)}
+    </g>
+    <g class="sp sp-cyborgai">
+      <!-- ear pods -->
+      <rect x="28" y="100" width="16" height="30" rx="8" class="p-ai-pod"/>
+      <rect x="156" y="100" width="16" height="30" rx="8" class="p-ai-pod"/>
+      <rect x="34" y="106" width="4" height="18" rx="2" class="p-ai-glow"/>
+      <rect x="162" y="106" width="4" height="18" rx="2" class="p-ai-glow"/>
+      <!-- chest core -->
+      <circle cx="100" cy="146" r="12" class="p-ai-chest"/>
+      ${logo(100, 147.5, 1.15)}
+      <!-- CYBORG ERP banner across the belly -->
+      <path d="M50 156 Q100 170 150 156 L148 168 Q100 182 52 168 Z" class="p-ai-banner"/>
+      <path d="M50 156 L42 160 L50 163 Z M150 156 L158 160 L150 163 Z" class="p-ai-banner-tail"/>
+      <text x="100" y="171" text-anchor="middle" class="p-ai-banner-text">CYBORG ERP</text>
     </g>
     <g class="sp sp-dino">
       <circle class="p-spot" cx="58" cy="100" r="5"/><circle class="p-spot" cx="146" cy="96" r="4"/><circle class="p-spot" cx="140" cy="150" r="5"/>
@@ -135,6 +158,10 @@
 
     <g class="p-face">
       <g class="sp sp-robot"><rect x="57" y="93" width="86" height="40" rx="19" class="p-visor"/></g>
+      <g class="sp sp-cyborgai">
+        <rect x="54" y="92" width="92" height="44" rx="22" class="p-ai-visor" fill="url(#${id('visor')})"/>
+        <path d="M62 100 Q80 95 98 97" class="p-ai-visor-shine"/>
+      </g>
       <g class="sp sp-fox">
         <path class="p-mask" d="M60 118 C68 140 88 147 100 147 C112 147 132 140 140 118 C128 127 113 129 100 127 C87 129 72 127 60 118 Z"/>
       </g>
@@ -254,6 +281,18 @@
 
     <g class="p-arm-l"><ellipse cx="42" cy="133" rx="8.5" ry="14" transform="rotate(18 42 133)" class="p-arm" fill="url(#${id('limb')})"/></g>
     <g class="p-arm-r"><ellipse cx="158" cy="133" rx="8.5" ry="14" transform="rotate(-18 158 133)" class="p-arm" fill="url(#${id('limb')})"/></g>
+
+    <!-- Cyborg AI holds the Cyborg ERP flag -->
+    <g class="sp sp-cyborgai">
+      <line x1="166" y1="182" x2="166" y2="56" class="p-ai-pole"/>
+      <circle cx="166" cy="54" r="3.5" class="p-ai-pole-tip"/>
+      <g class="p-ai-flag">
+        <path d="M167 58 Q182 54 198 60 L198 86 Q182 80 167 84 Z" class="p-ai-flag-cloth"/>
+        ${logo(182, 70, 0.75)}
+        <text x="182.5" y="81.5" text-anchor="middle" class="p-ai-flag-text">CYBORG</text>
+      </g>
+      <ellipse cx="163" cy="146" rx="6" ry="5" class="p-ai-hand" fill="url(#${id('limb')})"/>
+    </g>
 
     <path class="p-sweat" d="M154 84 C158 91 160 95 156 98 C152 100 149 96 151 92 Z"/>
   </g>

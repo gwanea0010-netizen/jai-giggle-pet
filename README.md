@@ -39,7 +39,19 @@ Uninstall from Windows "Installed apps".
 
 **Fun menu:** feed a snack 🍪 · dance party 💃 · dev jokes 😂 · tips 💡 · motivate me 💪 · walk around 🚶
 
-**Pets:** Giggles Cat · Cyborg Bot · Bunny · Panda · Dino · Fox · Koala
+**Pets:** Giggles Cat · 🤖 **Cyborg AI** (official Cyborg ERP bot with banner and flag) · Cyborg Bot · Bunny · Panda · Dino · Fox · Koala
+
+## Code & SQL helper 🔍
+
+Open Visual Studio, SSMS, VS Code or Azure Data Studio and the pet notices ("🗄️ SQL time on CyborgDB!"). Copy a query or some code (Ctrl+C) and it reviews it on the spot:
+
+- ⚠️ `UPDATE` / `DELETE` without `WHERE`, `TRUNCATE`, `= NULL`, open transactions
+- 🔐 SQL injection: dynamic SQL glued with `+`, C# SQL strings built with `+` or `$"{}"`, hard-coded passwords
+- 🐢 Performance: functions on columns in `WHERE`, leading `%` in `LIKE`, `NOT IN (SELECT…)`, `COUNT(*) > 0`, cursors, `TOP` without `ORDER BY`, `NOLOCK`
+- 🎯 Style: `SELECT *`, comma joins, `INSERT` without a column list, missing `SET NOCOUNT ON`
+- C#: `.Result` / `.Wait()`, empty `catch`, `async void`, `SqlConnection` without `using`, `new HttpClient()` per call
+
+Everything runs locally and nothing is sent anywhere. Turn it off in Settings → Code & SQL helper.
 
 ## Wardrobe 👕
 

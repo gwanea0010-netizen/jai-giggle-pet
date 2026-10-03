@@ -97,7 +97,7 @@
       $('w-next').textContent = `Next: ${next.emoji} ${next.name} in ${next.unlock - total} more task${next.unlock - total === 1 ? '' : 's'}`;
     } else {
       $('w-bar').style.width = '100%';
-      $('w-next').textContent = '🏅 Everything unlocked. Legend!';
+      $('w-next').textContent = 'ðŸ… Everything unlocked. Legend!';
     }
 
     const root = $('wardrobe');
@@ -111,11 +111,11 @@
         const unlocked = isUnlocked(a, total, collected);
         const worn = eq[slot] === a.id;
         const f = a.festival && FESTIVALS.find((x) => x.id === a.festival);
-        const lockText = f ? `${f.emoji} ${f.name} special · preview` : `Unlocks at ${a.unlock} tasks · preview`;
+        const lockText = f ? `${f.emoji} ${f.name} special Â· preview` : `Unlocks at ${a.unlock} tasks Â· preview`;
         const el = document.createElement('button');
         el.className = `item${unlocked ? '' : ' locked'}${worn ? ' equipped' : ''}`;
-        el.innerHTML = `${f ? `<span class="tag">FESTIVAL</span>` : ''}<span class="emoji">${unlocked ? a.emoji : '🔒'}</span><b>${a.name}</b>
-          <small>${worn ? '✅ Wearing (click to remove)' : unlocked ? 'Click to wear' : lockText}</small>`;
+        el.innerHTML = `${f ? `<span class="tag">FESTIVAL</span>` : ''}<span class="emoji">${unlocked ? a.emoji : 'ðŸ”’'}</span><b>${a.name}</b>
+          <small>${worn ? 'âœ… Wearing (click to remove)' : unlocked ? 'Click to wear' : lockText}</small>`;
         el.addEventListener('click', () => {
           if (!unlocked) return api.trigger('preview', a.id);
           save({ equipped: { [slot]: worn ? '' : a.id } });
@@ -149,7 +149,7 @@
     $('team-setup').hidden = !!t.folder;
     $('team-board').hidden = !t.folder;
     if (!t.folder) return;
-    $('team-folder').textContent = `📁 ${t.folder}`;
+    $('team-folder').textContent = `ðŸ“ ${t.folder}`;
     const members = [...t.members];
     if (boardMode === 'total') members.sort((a, b) => b.total - a.total);
     const list = $('board');
@@ -158,7 +158,7 @@
       list.innerHTML = '<li class="empty">No one here yet. Finish a task to show up!</li>';
       return;
     }
-    const medals = ['🥇', '🥈', '🥉'];
+    const medals = ['ðŸ¥‡', 'ðŸ¥ˆ', 'ðŸ¥‰'];
     members.forEach((m, i) => {
       const li = document.createElement('li');
       if (m.id === t.me) li.className = 'me';
@@ -166,7 +166,7 @@
       li.innerHTML = `
         <span class="rank">${score > 0 && medals[i] ? medals[i] : i + 1}</span>
         <span class="mini">${PetSVG('tm-' + i)}</span>
-        <span class="who"><b>${esc(m.ownerName)}${m.id === t.me ? ' (you)' : ''}</b><small>${esc(m.petName)} · ${ago(m.updatedAt)}</small></span>
+        <span class="who"><b>${esc(m.ownerName)}${m.id === t.me ? ' (you)' : ''}</b><small>${esc(m.petName)} Â· ${ago(m.updatedAt)}</small></span>
         <span class="score"><b>${score}</b><small>${boardMode === 'today' ? 'today' : 'all time'}</small></span>`;
       dress(li.querySelector('.pet'), m);
       list.appendChild(li);
@@ -185,10 +185,10 @@
     const owner = (S.ownerName || '').trim();
     $('title').textContent = S.petName || 'Giggles';
     $('subtitle').textContent = owner ? `${owner}'s Cyborg ERP dev buddy` : 'Your Cyborg ERP dev buddy';
-    document.title = `${S.petName} · Settings`;
+    document.title = `${S.petName} Â· Settings`;
     $('greet-preview').textContent = owner
-      ? `${S.petName} will say things like "All done, ${owner}! 🎉"`
-      : 'Tell your pet your name so it can greet you 🧡';
+      ? `${S.petName} will say things like "All done, ${owner}! ðŸŽ‰"`
+      : 'Tell your pet your name so it can greet you ðŸ§¡';
 
     if (document.activeElement !== $('ownerName')) $('ownerName').value = S.ownerName || '';
     if (document.activeElement !== $('petName')) $('petName').value = S.petName || '';
@@ -204,7 +204,7 @@
     $('scale').value = S.scale;
     $('scale-out').textContent = `${Math.round(S.scale * 100)}%`;
 
-    for (const k of ['sound', 'media', 'roam', 'notifications', 'startWithWindows']) $(k).checked = !!S[k];
+    for (const k of ['sound', 'media', 'codeHelper', 'roam', 'notifications', 'startWithWindows']) $(k).checked = !!S[k];
     $('volume').value = S.volume;
     $('tipsEvery').value = String(S.tipsEvery);
     $('autoUpdate').checked = S.autoUpdate !== false;
@@ -231,16 +231,17 @@
   $('scale').addEventListener('change', () => save({ scale: Number($('scale').value) }));
   $('volume').addEventListener('change', () => save({ volume: Number($('volume').value) }));
   $('tipsEvery').addEventListener('change', () => save({ tipsEvery: Number($('tipsEvery').value) }));
-  for (const k of ['sound', 'media', 'roam', 'notifications', 'startWithWindows']) {
+  for (const k of ['sound', 'media', 'codeHelper', 'roam', 'notifications', 'startWithWindows']) {
     $(k).addEventListener('change', () => save({ [k]: $(k).checked }));
   }
 
   document.querySelectorAll('[data-try]').forEach((b) =>
     b.addEventListener('click', () => {
       const t = b.dataset.try;
-      if (t === 'working') api.trigger('working', 'Editing code…');
+      if (t === 'working') api.trigger('working', 'Editing codeâ€¦');
       else if (t === 'attention') api.trigger('attention', 'Claude needs your permission to run a command');
       else if (t === 'music') api.trigger('music', 'Kesariya - YouTube - Google Chrome');
+      else if (t === 'codetest') api.trigger('codetest', "UPDATE dbo.StudentFees SET Status = 'Paid'\nSELECT * FROM dbo.Students WITH (NOLOCK) WHERE Email LIKE '%gmail.com'");
       else api.trigger(t);
     })
   );
@@ -251,12 +252,12 @@
     const el = $('hooks-status');
     const btn = $('hooks-btn');
     if (st.installed) {
-      el.textContent = '✅ Connected to Claude Code';
+      el.textContent = 'âœ… Connected to Claude Code';
       el.className = 'status ok';
       btn.textContent = 'Disconnect';
       btn.classList.add('danger');
     } else {
-      el.textContent = st.connected && st.connected.length ? '⚠️ Partially connected' : '⛔ Not connected';
+      el.textContent = st.connected && st.connected.length ? 'âš ï¸ Partially connected' : 'â›” Not connected';
       el.className = 'status bad';
       btn.textContent = 'Connect';
       btn.classList.remove('danger');
@@ -292,21 +293,21 @@
       btn.textContent = label;
     }
   }
-  $('share-btn').addEventListener('click', () => runButton('share-btn', 'share-status', '⏳ Packing…', api.createShare, '✅ Ready:'));
-  $('build-btn').addEventListener('click', () => runButton('build-btn', 'build-status', '⏳ Building… (1–3 min)', api.buildInstaller, '✅ Installer ready:'));
+  $('share-btn').addEventListener('click', () => runButton('share-btn', 'share-status', 'â³ Packingâ€¦', api.createShare, 'âœ… Ready:'));
+  $('build-btn').addEventListener('click', () => runButton('build-btn', 'build-status', 'â³ Buildingâ€¦ (1â€“3 min)', api.buildInstaller, 'âœ… Installer ready:'));
 
   // ---------- updates ----------
   function renderUpdate(u) {
     const el = $('update-status');
     const v = `v${u.current}`;
     const map = {
-      'no-source': [`${v} · Pick a team folder (🏆 tab) or an update source below`, 'muted'],
-      checking: [`${v} · Checking…`, 'muted'],
-      latest: [`✅ ${v} · Up to date`, 'ok'],
-      downloading: [`${v} · Downloading ${u.version}…`, 'muted'],
-      ready: [`🎁 ${u.version} ready to install${u.notes ? `: ${u.notes}` : ''}`, 'ok'],
-      dev: [`${v} (source checkout) · ${u.version} published`, 'muted'],
-      error: [`${v} · Couldn't check: ${u.error}`, 'bad'],
+      'no-source': [`${v} Â· Pick a team folder (ðŸ† tab) or an update source below`, 'muted'],
+      checking: [`${v} Â· Checkingâ€¦`, 'muted'],
+      latest: [`âœ… ${v} Â· Up to date`, 'ok'],
+      downloading: [`${v} Â· Downloading ${u.version}â€¦`, 'muted'],
+      ready: [`ðŸŽ ${u.version} ready to install${u.notes ? `: ${u.notes}` : ''}`, 'ok'],
+      dev: [`${v} (source checkout) Â· ${u.version} published`, 'muted'],
+      error: [`${v} Â· Couldn't check: ${u.error}`, 'bad'],
       idle: [`${v}`, 'muted'],
     };
     const [text, cls] = map[u.status] || map.idle;
@@ -321,8 +322,8 @@
   $('updateSource').addEventListener('change', () => save({ updateSource: $('updateSource').value }));
   $('autoUpdate').addEventListener('change', () => save({ autoUpdate: $('autoUpdate').checked }));
   $('publish-btn').addEventListener('click', () =>
-    runButton('publish-btn', 'publish-status', '⏳ Publishing… (1–3 min)',
-      () => api.updatePublish({ level: $('release-level').value, notes: $('release-notes').value }), '✅ Published:')
+    runButton('publish-btn', 'publish-status', 'â³ Publishingâ€¦ (1â€“3 min)',
+      () => api.updatePublish({ level: $('release-level').value, notes: $('release-notes').value }), 'âœ… Published:')
   );
 
   api.onSettings((s) => {

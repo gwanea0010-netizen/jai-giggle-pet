@@ -375,9 +375,58 @@
     if (callOn) { callOn = false; updateAccessories(); }
   }
 
+  // ---------- code & SQL helper ----------
+  const CODE_APPS = { ssms: 'sql', azuredatastudio: 'sql', dbeaver: 'sql', datagrip64: 'sql', devenv: 'vs', rider64: 'vs', code: 'vscode' };
+  let lastCodeApp = '';
+  const codeQuipAt = {};
+
+  function codeAppLine(kind, title = '') {
+    const o = owner();
+    if (kind === 'sql') {
+      // SSMS title: "SQLQuery1.sql - SERVER.Database (user (55)) - Microsoft SQL Server Management Studio"
+      const db = (title.match(/ - [^ ]+?\.([^ .(]+) \(/) || [])[1];
+      return `🗄️ SQL time${db ? ` on ${db}` : ''}, ${o}! Copy a query (Ctrl+C) and I'll review it 🔍`;
+    }
+    const project = title.split(' - ')[0].replace(/[*●]/g, '').trim();
+    const ide = kind === 'vs' ? 'Visual Studio' : 'VS Code';
+    return `🛠️ ${project && project.length < 40 ? `${project} in ${ide}` : `${ide} time`}! Copy code (Ctrl+C) and I'll check it 🔍`;
+  }
+
+  function reviewCode(text) {
+    const r = CodeCheck.review(text);
+    if (!r || ['fly', 'aim', 'eat'].includes(state)) return;
+    const label = r.kind === 'sql' ? '🔍 SQL check' : '🔍 Code check';
+    if (!r.issues.length) {
+      if (state === 'idle') setLook('happy', 'grin');
+      return showBubble(r.kind === 'sql' ? `✅ Query looks clean, ${owner()}!` : `✅ Looks good, ${owner()}!`, { sub: label, cls: 'tip', ms: 3000 });
+    }
+    const high = r.issues.some((i) => i.level === 'high');
+    if (state === 'idle' || state === 'music') setLook('open', high ? 'o' : 'flat');
+    const top = r.issues.slice(0, 2).map((i) => i.text).join('\n\n');
+    const more = r.issues.length > 2 ? ` · +${r.issues.length - 2} more` : '';
+    showBubble(top, { sub: `${label}${more}`, cls: high ? 'attention long code' : 'tip long code', ms: 6000 + top.length * 40 });
+    if (high) play('ping');
+  }
+
+  window.pet.onCodeClip(({ text }) => {
+    if (S.codeHelper === false) return;
+    lastActivity = Date.now();
+    reviewCode(text);
+  });
+
   let manualUntil = 0; // test triggers from Settings win over the live monitor for a while
 
   window.pet.onSystem((d) => {
+    // Greet the developer when they switch to Visual Studio / SQL tools.
+    const kind = CODE_APPS[String(d.fgProc || '').toLowerCase()] || '';
+    if (S.codeHelper !== false && kind && kind !== lastCodeApp && state === 'idle' && !callOn && Date.now() - (codeQuipAt[kind] || 0) > 20 * 60 * 1000) {
+      codeQuipAt[kind] = Date.now();
+      setLook('happy', 'grin');
+      showBubble(codeAppLine(kind, d.fgTitle), { cls: 'thought long', ms: 5000 });
+      setTimeout(() => state === 'idle' && setLook('open', 'smile'), 5000);
+    }
+    lastCodeApp = kind;
+
     if (!S.media || Date.now() < manualUntil) return;
     mediaTitle = d.media || '';
 
@@ -430,6 +479,7 @@
       case 'dance': goDance(); break;
       case 'joke': tellJoke(); break;
       case 'quote': showQuote(); break;
+      case 'codetest': reviewCode(detail || ''); break;
       case 'tip': showTip(); break;
       case 'preview': previewItem(detail); break;
       case 'unlock': setTimeout(() => goUnlock(detail), 4800); break; // after the "done" party
@@ -543,7 +593,7 @@
     const r = wrap.getBoundingClientRect();
     const nx = clamp((clientX - (r.left + r.width / 2)) / (r.width * 0.9), -1, 1);
     const ny = clamp((clientY - (r.top + r.height * 0.55)) / (r.height * 0.9), -1, 1);
-    if (aim || state === 'fly') return;
+    if (aim || dragging || down || state === 'fly') return;
     if (state !== 'walk') setTilt(nx, ny);
     if (pet.dataset.eyes !== 'open' || state === 'working' || state === 'eat') return;
     lookAt(nx * 4.5, ny * 4);
@@ -685,7 +735,7 @@
   // ---------- slingshot: hold still ~0.5s, pull back, let go ----------
   const sling = document.getElementById('sling');
   const sctx = sling.getContext('2d');
-  const HOLD_MS = 450;
+  const HOLD_MS = 600;
   const MAX_PULL = 170;
   const POWER = 0.3; // px of pull -> px/frame launch speed
   const VIS = 0.28; // how far the pet visibly stretches inside its window
@@ -811,42 +861,81 @@
     after(7000, settle);
   });
 
+  // A yellow ring fills while you hold still; full ring = slingshot, move earlier = normal drag.
+  let holdRaf = null;
+  function startHoldRing() {
+    const t0 = performance.now();
+    const tick = (now) => {
+      const p = Math.min(1, (now - t0) / HOLD_MS);
+      drawHoldRing(p);
+      if (p < 1) holdRaf = requestAnimationFrame(tick);
+      else { holdRaf = null; startAim(); }
+    };
+    holdRaf = requestAnimationFrame(tick);
+  }
+  function cancelHoldRing() {
+    clearTimeout(holdTimer);
+    if (holdRaf) cancelAnimationFrame(holdRaf);
+    holdRaf = null;
+    if (!aim) sctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+  }
+  function drawHoldRing(p) {
+    const W = window.innerWidth;
+    const H = window.innerHeight;
+    const s = S.scale;
+    const cx = W / 2;
+    const cy = H - 100 * s;
+    const r = 82 * s;
+    sctx.clearRect(0, 0, W, H);
+    if (p < 0.15) return; // don't flash a ring on quick clicks
+    sctx.lineCap = 'round';
+    sctx.lineWidth = 5 * s;
+    sctx.strokeStyle = 'rgba(255, 210, 63, .25)';
+    sctx.beginPath();
+    sctx.arc(cx, cy, r, 0, Math.PI * 2);
+    sctx.stroke();
+    sctx.strokeStyle = '#ffd23f';
+    sctx.beginPath();
+    sctx.arc(cx, cy, r, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * p);
+    sctx.stroke();
+  }
+
+  function endDrag() {
+    dragging = false;
+    wrap.classList.remove('dragging');
+    window.pet.dragEnd();
+  }
+
   hit.addEventListener('pointerdown', (e) => {
     if (e.button !== 0) return;
     hit.setPointerCapture(e.pointerId);
-    down = { x: e.screenX, y: e.screenY, lx: e.screenX, ly: e.screenY };
-    clearTimeout(holdTimer);
-    if (state !== 'fly') holdTimer = setTimeout(startAim, HOLD_MS);
+    down = { x: e.screenX, y: e.screenY };
+    cancelHoldRing();
+    if (state !== 'fly') startHoldRing();
   });
   hit.addEventListener('pointermove', (e) => {
     if (!down) return;
     if (aim) return updateAim(e);
-    if (!dragging && Math.hypot(e.screenX - down.x, e.screenY - down.y) > 4) {
-      clearTimeout(holdTimer);
+    if (!dragging && Math.hypot(e.screenX - down.x, e.screenY - down.y) > 6) {
+      cancelHoldRing();
       dragging = true;
       wrap.classList.add('dragging');
       if (state === 'walk') goIdle();
-    }
-    if (dragging) {
-      window.pet.moveBy(e.screenX - down.lx, e.screenY - down.ly);
-      down.lx = e.screenX;
-      down.ly = e.screenY;
+      setTilt(0, 0);
+      window.pet.dragStart(); // main process glues the window to the cursor from here
     }
   });
   hit.addEventListener('pointerup', (e) => {
     if (!down) return;
-    clearTimeout(holdTimer);
+    cancelHoldRing();
     hit.releasePointerCapture(e.pointerId);
     if (aim) {
       down = null;
       return releaseAim();
     }
     if (state === 'fly') { down = null; return; }
-    const wasDrag = dragging;
     down = null;
-    dragging = false;
-    wrap.classList.remove('dragging');
-    if (wasDrag) return window.pet.dragEnd();
+    if (dragging) return endDrag();
 
     lastActivity = Date.now();
     const now = Date.now();
@@ -858,15 +947,13 @@
   });
   // If the OS takes the mouse away mid-gesture (alt-tab, lock screen…), finish it cleanly.
   hit.addEventListener('lostpointercapture', () => {
-    clearTimeout(holdTimer);
+    cancelHoldRing();
     if (aim) {
       down = null;
       releaseAim();
     } else if (dragging) {
       down = null;
-      dragging = false;
-      wrap.classList.remove('dragging');
-      window.pet.dragEnd();
+      endDrag();
     }
   });
   hit.addEventListener('dblclick', () => goDone(lastProject));

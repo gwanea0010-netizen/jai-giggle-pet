@@ -78,6 +78,8 @@ html, body {
 #bubble.attention { background: #fff6cf; }
 #bubble.music { background: #efeaff; }
 #bubble.tip { background: #e9f8ee; }
+#bubble.code { max-width: 262px; text-align: left; font-size: 12px; }
+#bubble.code #bubble-text { white-space: pre-line; }
 
 /* thought bubble: puffy, with little circles instead of a tail */
 #bubble.thought { border-radius: 26px; border-style: dashed; background: #f4f8ff; }
