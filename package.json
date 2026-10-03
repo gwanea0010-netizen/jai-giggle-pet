@@ -1,0 +1,72 @@
+{
+  "name": "giggles-pet",
+  "productName": "Giggles Pet",
+  "version": "3.1.0",
+  "description": "Cyborg ERP desktop pet that reacts to Claude Code: works while Claude works, celebrates when it finishes.",
+  "author": "Cyborg ERP Team",
+  "license": "UNLICENSED",
+  "private": true,
+  "main": "main.js",
+  "scripts": {
+    "postinstall": "node scripts/setup.js",
+    "start": "electron .",
+    "install-hooks": "node scripts/install-hooks.js",
+    "uninstall-hooks": "node scripts/install-hooks.js --remove",
+    "share": "node scripts/share.js",
+    "build-hook": "node scripts/build-hook.js",
+    "dist": "node scripts/build-hook.js && electron-builder --win nsis",
+    "test-done": "node scripts/send.js done",
+    "test-working": "node scripts/send.js working",
+    "test-attention": "node scripts/send.js attention",
+    "test-music": "node scripts/send.js music",
+    "test-snack": "node scripts/send.js snack",
+    "release": "node scripts/release.js"
+  },
+  "build": {
+    "appId": "com.cyborgerp.gigglespet",
+    "productName": "Giggles Pet",
+    "copyright": "Cyborg ERP",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "lib/**",
+      "renderer/**",
+      "system/**",
+      "assets/**",
+      "scripts/install-hooks.js",
+      "scripts/share.js",
+      "package.json"
+    ],
+    "asarUnpack": [
+      "system/**"
+    ],
+    "extraResources": [
+      {
+        "from": "build/pet-hook.exe",
+        "to": "pet-hook.exe"
+      }
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "build/icon.png",
+      "artifactName": "Giggles-Pet-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "runAfterFinish": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Giggles Pet",
+      "include": "build/installer.nsh"
+    }
+  },
+  "devDependencies": {
+    "electron": "^38.0.0",
+    "electron-builder": "^26.0.0"
+  }
+}

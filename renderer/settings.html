@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'" />
+  <title>Pet Settings</title>
+  <link rel="stylesheet" href="pet.css" />
+  <link rel="stylesheet" href="settings.css" />
+</head>
+<body>
+  <header class="hero">
+    <img src="../assets/cyborg-erp-logo.jpg" alt="Cyborg ERP" class="hero-logo" />
+    <div>
+      <h1 id="title">Giggles</h1>
+      <p id="subtitle">Your Cyborg ERP dev buddy</p>
+    </div>
+    <div class="hero-pet" id="hero-pet"></div>
+  </header>
+
+  <nav class="tabs" role="tablist">
+    <button role="tab" data-tab="pet">🐾 My Pet</button>
+    <button role="tab" data-tab="wardrobe">👕 Wardrobe</button>
+    <button role="tab" data-tab="team">🏆 Team</button>
+    <button role="tab" data-tab="settings">⚙️ Settings</button>
+  </nav>
+
+  <main>
+    <!-- ================= MY PET ================= -->
+    <section class="panel" data-panel="pet">
+      <div class="card">
+        <h2>👋 You &amp; your pet</h2>
+        <div class="grid2">
+          <label class="field">
+            <span>Your name (owner)</span>
+            <input id="ownerName" maxlength="40" placeholder="e.g. Jai" autocomplete="off" />
+          </label>
+          <label class="field">
+            <span>Pet name</span>
+            <input id="petName" maxlength="40" placeholder="Giggles" autocomplete="off" />
+          </label>
+        </div>
+        <p class="hint" id="greet-preview"></p>
+      </div>
+
+      <div class="card">
+        <h2>🐾 Choose your pet</h2>
+        <div class="species" id="species"></div>
+      </div>
+
+      <div class="card">
+        <h2>📏 Size</h2>
+        <div class="presets" id="size-presets"></div>
+        <div class="range-row">
+          <span>🐣</span>
+          <input type="range" id="scale" min="0.45" max="1.5" step="0.05" />
+          <span>🦖</span>
+          <output id="scale-out"></output>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>🎈 Try it</h2>
+        <div class="buttons">
+          <button data-try="working">💻 Working</button>
+          <button data-try="done">🎉 Done</button>
+          <button data-try="attention">❗ Needs you</button>
+          <button data-try="music">🎧 Music</button>
+          <button data-try="call">🎙️ On a call</button>
+          <button data-try="snack">🍪 Snack</button>
+          <button data-try="dance">💃 Dance</button>
+          <button data-try="joke">😂 Joke</button>
+          <button data-try="tip">💡 Tip</button>
+        </div>
+        <p class="hint">On the pet: click = tickle · rub = pat 💕 · double-click = celebrate · drag = move · right-click = menu</p>
+      </div>
+    </section>
+
+    <!-- ================= WARDROBE ================= -->
+    <section class="panel" data-panel="wardrobe">
+      <div class="card progress-card">
+        <div class="progress-head">
+          <div>
+            <h2>👕 Wardrobe</h2>
+            <p class="hint" id="wardrobe-sub">Finish Claude tasks to unlock outfits for your pet.</p>
+          </div>
+          <div class="big-count"><b id="w-total">0</b><span>tasks finished</span></div>
+        </div>
+        <div class="bar"><div class="bar-fill" id="w-bar"></div></div>
+        <p class="hint" id="w-next"></p>
+      </div>
+      <div class="card festival-card" id="festival-card"></div>
+      <div id="wardrobe"></div>
+      <p class="hint center">Locked items: click to preview them on your pet for a few seconds 👀</p>
+    </section>
+
+    <!-- ================= TEAM ================= -->
+    <section class="panel" data-panel="team">
+      <div class="card" id="team-setup">
+        <h2>🏆 Team leaderboard</h2>
+        <p>See who finishes the most Claude tasks today. Everyone's pet shows up with its outfit!</p>
+        <ol class="steps">
+          <li>Pick a folder the whole team can reach: a <b>shared network drive</b> (<code>\\server\share</code>), a synced <b>OneDrive / SharePoint / Teams</b> folder, or <b>Google Drive</b></li>
+          <li>Every developer picks the <b>same folder</b> in their pet</li>
+          <li>Only names, pet looks and task counts are shared, never code</li>
+        </ol>
+        <button id="team-pick" class="primary">📁 Choose team folder</button>
+      </div>
+
+      <div class="card" id="team-board" hidden>
+        <div class="board-head">
+          <h2>🏆 Leaderboard</h2>
+          <div class="seg">
+            <button data-board="today" class="active">Today</button>
+            <button data-board="total">All time</button>
+          </div>
+        </div>
+        <ol class="board" id="board"></ol>
+        <div class="status-row board-foot">
+          <span class="status muted" id="team-folder"></span>
+          <span class="actions">
+            <button id="team-refresh">🔄 Refresh</button>
+            <button id="team-open">📂 Open</button>
+            <button id="team-change">Change</button>
+            <button id="team-leave">Leave</button>
+          </span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= SETTINGS ================= -->
+    <section class="panel" data-panel="settings">
+      <div class="card">
+        <h2>🎛️ Behaviour</h2>
+        <div class="toggles">
+          <label class="toggle"><input type="checkbox" id="sound" /><span class="sw"></span><div><b>Sounds</b><small>Giggles, chimes &amp; purrs</small></div></label>
+          <label class="toggle"><input type="checkbox" id="media" /><span class="sw"></span><div><b>React to music, calls &amp; browser</b><small>Headphones on YouTube/Spotify, headset + quiet mode on calls, thinks when you open Chrome</small></div></label>
+          <label class="toggle"><input type="checkbox" id="roam" /><span class="sw"></span><div><b>Walk around</b><small>Strolls along your screen when idle</small></div></label>
+          <label class="toggle"><input type="checkbox" id="notifications" /><span class="sw"></span><div><b>Windows notifications</b><small>Also show a toast when work is done</small></div></label>
+          <label class="toggle"><input type="checkbox" id="startWithWindows" /><span class="sw"></span><div><b>Start with Windows</b><small>Pet appears when you log in</small></div></label>
+        </div>
+        <div class="grid2" style="margin-top:14px">
+          <label class="field">
+            <span>Volume</span>
+            <input type="range" id="volume" min="0" max="1" step="0.05" />
+          </label>
+          <label class="field">
+            <span>Wellness &amp; coding tips</span>
+            <select id="tipsEvery">
+              <option value="0">Off</option>
+              <option value="15">Every 15 min</option>
+              <option value="30">Every 30 min</option>
+              <option value="60">Every hour</option>
+            </select>
+          </label>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>🔌 Claude Code connection</h2>
+        <div class="status-row">
+          <div id="hooks-status" class="status">Checking…</div>
+          <button id="hooks-btn" class="primary">Connect</button>
+        </div>
+        <p class="hint">Restart Claude Code after connecting. The pet only receives the event type, project folder and tool name, never your prompts or code.</p>
+      </div>
+
+      <div class="card">
+        <h2>🔄 Updates</h2>
+        <div class="status-row">
+          <div id="update-status" class="status">Version …</div>
+          <span class="actions">
+            <button id="update-check">Check now</button>
+            <button id="update-install" class="primary" hidden>Restart &amp; update</button>
+          </span>
+        </div>
+        <label class="toggle" style="margin-top:12px"><input type="checkbox" id="autoUpdate" /><span class="sw"></span><div><b>Update automatically</b><small>Installs quietly when Claude has been idle for a few minutes</small></div></label>
+        <label class="field" style="margin-top:12px">
+          <span>Update source (folder or https URL). Leave empty to use the team folder</span>
+          <div class="input-row">
+            <input id="updateSource" placeholder="Uses <team folder>\giggles-updates" autocomplete="off" />
+            <button id="update-pick">📁</button>
+          </div>
+        </label>
+
+        <div id="publish-box">
+          <h3>🚀 Publish a new version to the team</h3>
+          <div class="input-row">
+            <input id="release-notes" placeholder="What's new? (optional)" maxlength="300" autocomplete="off" />
+            <select id="release-level">
+              <option value="patch">Small update</option>
+              <option value="minor">Big update</option>
+            </select>
+            <button id="publish-btn" class="primary">Publish</button>
+          </div>
+          <p class="hint" id="publish-status">Builds the installer and puts it in the update folder. Everyone's pet updates itself.</p>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>📊 Stats</h2>
+        <div class="stats">
+          <div><b id="stat-today">0</b><span>tasks finished today</span></div>
+          <div><b id="stat-total">0</b><span>all time</span></div>
+        </div>
+      </div>
+
+      <div class="card share">
+        <h2>🤝 Share with your team</h2>
+        <div id="share-dev">
+          <h3>⭐ Installer (recommended, no Node.js needed)</h3>
+          <ol>
+            <li>Click <b>Build installer</b>. You get <code>Giggles-Pet-Setup.exe</code> (takes a minute)</li>
+            <li>Send it to a developer. They double-click it and the pet appears, already connected to Claude Code</li>
+            <li>If Windows shows "protected your PC": <b>More info → Run anyway</b></li>
+          </ol>
+          <div class="status-row">
+            <div id="build-status" class="status muted">Each developer sets their own name on first launch.</div>
+            <button id="build-btn" class="primary">🛠️ Build installer</button>
+          </div>
+          <h3>Zip (for developers who have Node.js)</h3>
+          <div class="status-row">
+            <div id="share-status" class="status muted">Unzip → double-click <code>Install-Giggles.bat</code></div>
+            <button id="share-btn">📦 Create zip</button>
+          </div>
+        </div>
+        <div id="share-packaged" hidden>
+          <p>Send teammates the same <code>Giggles-Pet-Setup.exe</code> you installed from. They double-click it and are done. Then pick the same team folder in the 🏆 Team tab.</p>
+        </div>
+        <p class="hint" id="version"></p>
+      </div>
+    </section>
+  </main>
+
+  <footer>Cyborg ERP · Digital Transformation</footer>
+
+  <script src="species.js"></script>
+  <script src="accessories.js"></script>
+  <script src="pet-svg.js"></script>
+  <script src="settings.js"></script>
+</body>
+</html>
