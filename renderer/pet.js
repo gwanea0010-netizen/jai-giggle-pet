@@ -906,11 +906,26 @@
   const sling = document.getElementById('sling');
   const sctx = sling.getContext('2d');
   const HOLD_MS = 600;
-  const MAX_PULL = 170;
-  const POWER = 0.3; // px of pull -> px/frame launch speed
-  const VIS = 0.28; // how far the pet visibly stretches inside its window
+  const MAX_PULL = 320; // a long pull = a big launch
+  const MAX_VIS = 40; // how far the pet visibly stretches inside its small window
   let holdTimer = null;
-  let aim = null; // { ax, ay, px, py }
+  let aim = null; // { ax, ay, px, py, tick }
+
+  // Power grows faster than the pull (quadratic), so a full pull really flies: ~107 px/frame.
+  const launchSpeed = (d) => 0.16 * d + 0.00055 * d * d;
+  function launchVelocity(px, py) {
+    const d = Math.hypot(px, py);
+    if (!d) return { vx: 0, vy: 0 };
+    const v = launchSpeed(d);
+    return { vx: (-px / d) * v, vy: (-py / d) * v };
+  }
+  // Visible stretch: eases out so a long pull doesn't push the pet out of its window.
+  function visOffset(px, py) {
+    const d = Math.hypot(px, py);
+    if (!d) return { x: 0, y: 0 };
+    const off = MAX_VIS * Math.tanh(d / 170);
+    return { x: (px / d) * off, y: (py / d) * off };
+  }
 
   function sizeSling() {
     sling.width = window.innerWidth * devicePixelRatio;
@@ -922,7 +937,7 @@
 
   function startAim() {
     if (!down || dragging) return;
-    aim = { ax: down.x, ay: down.y, px: 0, py: 0 };
+    aim = { ax: down.x, ay: down.y, px: 0, py: 0, tick: 0 };
     setState('aim');
     setLook('open', 'o');
     setTilt(0, 0);
@@ -940,9 +955,16 @@
     aim.px = px;
     aim.py = py;
     const k = Math.hypot(px, py) / MAX_PULL;
-    wrap.style.transform = `translate(${px * VIS}px, ${py * VIS}px) rotate(${px * 0.08}deg) scale(${1 + k * 0.06}, ${1 - k * 0.08})`;
+    const off = visOffset(px, py);
+    wrap.style.transform = `translate(${off.x}px, ${off.y}px) rotate(${off.x * 0.18}deg) scale(${1 + k * 0.08}, ${1 - k * 0.12})`;
     lookAt((-px / MAX_PULL) * 4.5, (-py / MAX_PULL) * 4); // eyes on the target
-    if (k > 0.85) setLook('open', 'grin');
+    setLook('open', k > 0.75 ? 'grin' : 'o');
+    // once they start pulling, make room for the power meter
+    if (k > 0.05 && bubble.classList.contains('show')) hideBubble();
+    // a click at every quarter of power, each one higher
+    const level = Math.floor(k * 4 + 0.001);
+    if (level > aim.tick) { aim.tick = level; play('tick', level); }
+    if (level < aim.tick) aim.tick = level;
     drawSling();
   }
 
@@ -956,7 +978,8 @@
     const stemTop = H - 45 * s;
     const tipL = { x: cx - 78 * s, y: H - 100 * s };
     const tipR = { x: cx + 78 * s, y: H - 100 * s };
-    const pet = { x: cx + aim.px * VIS, y: H - 100 * s + aim.py * VIS };
+    const off = visOffset(aim.px, aim.py);
+    const pet = { x: cx + off.x, y: H - 100 * s + off.y };
     const k = Math.hypot(aim.px, aim.py) / MAX_PULL;
 
     // wooden fork
@@ -972,31 +995,92 @@
     sctx.lineTo(tipR.x, tipR.y);
     sctx.stroke();
 
-    // rubber bands get thinner and redder as they stretch
-    sctx.strokeStyle = `rgb(${90 + k * 140}, ${40 + (1 - k) * 30}, 40)`;
-    sctx.lineWidth = (6 - k * 3) * s;
+    // rubber bands: green -> yellow -> red and thinner as they stretch
+    const hue = 120 - k * 120;
+    sctx.strokeStyle = `hsl(${hue}, 80%, ${45 - k * 8}%)`;
+    sctx.lineWidth = (7 - k * 4) * s;
     sctx.beginPath();
     sctx.moveTo(tipL.x, tipL.y);
     sctx.lineTo(pet.x, pet.y);
     sctx.lineTo(tipR.x, tipR.y);
     sctx.stroke();
 
-    // trajectory preview (scaled down to fit the window)
-    if (k > 0.12) {
+    // trajectory preview with the real launch speed, scaled down to fit the window
+    if (k > 0.08) {
+      const v = launchVelocity(aim.px, aim.py);
       let x = pet.x;
       let y = pet.y;
-      let vx = -aim.px * POWER;
-      let vy = -aim.py * POWER;
-      for (let i = 1; i <= 14; i++) {
-        for (let j = 0; j < 3; j++) { vy += 1.1; x += vx * 0.07; y += vy * 0.07; }
-        sctx.globalAlpha = 1 - i / 16;
-        sctx.fillStyle = '#ffd23f';
+      let vx = v.vx;
+      let vy = v.vy;
+      const dots = 12 + Math.round(k * 12);
+      for (let i = 1; i <= dots; i++) {
+        for (let j = 0; j < 3; j++) { vy += 0.9; x += vx * 0.045; y += vy * 0.045; }
+        sctx.globalAlpha = Math.max(0, 1 - i / (dots + 2));
+        sctx.fillStyle = `hsl(${hue}, 90%, 55%)`;
         sctx.beginPath();
-        sctx.arc(x, y, (3.2 - i * 0.12) * s + 1, 0, Math.PI * 2);
+        sctx.arc(x, y, (3.4 - i * 0.08) * s + 1, 0, Math.PI * 2);
         sctx.fill();
       }
       sctx.globalAlpha = 1;
     }
+
+    // power meter
+    const pct = Math.round(k * 100);
+    const label = pct >= 100 ? '💥 MAX!' : `💪 ${pct}%`;
+    sctx.font = `800 ${Math.round(14 * Math.max(0.8, s))}px "Segoe UI", sans-serif`;
+    sctx.textAlign = 'center';
+    const ly = H - 210 * s;
+    const lw = sctx.measureText(label).width + 18;
+    sctx.fillStyle = 'rgba(15, 20, 36, .85)';
+    sctx.beginPath();
+    sctx.roundRect(cx - lw / 2, ly - 16, lw, 24, 12);
+    sctx.fill();
+    sctx.fillStyle = `hsl(${hue}, 90%, 60%)`;
+    sctx.fillText(label, cx, ly + 1);
+    // meter bar
+    const bw = 120 * Math.max(0.8, s);
+    sctx.fillStyle = 'rgba(255, 255, 255, .18)';
+    sctx.fillRect(cx - bw / 2, ly + 12, bw, 5);
+    sctx.fillStyle = `hsl(${hue}, 90%, 55%)`;
+    sctx.fillRect(cx - bw / 2, ly + 12, bw * k, 5);
+  }
+
+  // Speed lines behind the pet while it flies (drawn in its own window as it moves).
+  let trailRaf = null;
+  function startTrail(dir, power) {
+    stopTrail();
+    const t0 = performance.now();
+    const lines = Array.from({ length: 7 }, (_, i) => ({ y: 0.25 + i * 0.09, len: 0.4 + Math.random() * 0.6, phase: Math.random() }));
+    const frame = (now) => {
+      if (state !== 'fly') return stopTrail();
+      const W = window.innerWidth;
+      const H = window.innerHeight;
+      const s = S.scale;
+      const fade = Math.max(0.25, 1 - (now - t0) / 2500);
+      sctx.clearRect(0, 0, W, H);
+      sctx.lineCap = 'round';
+      sctx.lineWidth = 3 * s;
+      const cx = W / 2;
+      const petTop = H - 190 * s;
+      for (const l of lines) {
+        const y = petTop + l.y * 170 * s;
+        const wobble = ((now / 90 + l.phase * 10) % 1) * 30 * s;
+        const len = l.len * 90 * s * power;
+        const start = cx - dir * (70 * s + wobble);
+        sctx.strokeStyle = `rgba(255, 255, 255, ${0.55 * fade})`;
+        sctx.beginPath();
+        sctx.moveTo(start, y);
+        sctx.lineTo(start - dir * len, y);
+        sctx.stroke();
+      }
+      trailRaf = requestAnimationFrame(frame);
+    };
+    trailRaf = requestAnimationFrame(frame);
+  }
+  function stopTrail() {
+    if (trailRaf) cancelAnimationFrame(trailRaf);
+    trailRaf = null;
+    if (!aim) sctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
   }
 
   function releaseAim() {
@@ -1010,8 +1094,12 @@
     setLook('happy', 'grin');
     hideBubble();
     play('whee');
-    window.pet.fling(-px * POWER, -py * POWER);
+    const v = launchVelocity(px, py);
+    window.pet.fling(v.vx, v.vy);
     window.pet.stat('flings');
+    const k = Math.min(1, Math.hypot(px, py) / MAX_PULL);
+    if (k > 0.3) startTrail(Math.sign(v.vx) || 1, k);
+    if (k >= 0.98) showBubble('💥 MAX POWER!', { ms: 1500 });
   }
 
   window.pet.onFlyBounce(() => {

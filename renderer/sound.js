@@ -178,6 +178,20 @@ window.Sfx = (() => {
     o.stop(t + 1);
   }
 
+  // Slingshot tension click; higher for each power level (1..4).
+  function tick(level = 1) {
+    const c = ac();
+    const t = c.currentTime + 0.005;
+    const f = 380 + level * 220;
+    const o = c.createOscillator();
+    o.type = 'triangle';
+    o.frequency.setValueAtTime(f, t);
+    o.frequency.exponentialRampToValueAtTime(f * 1.5, t + 0.06);
+    o.connect(envGain(c, t, 0.28, 0.004, 0.09)).connect(master);
+    o.start(t);
+    o.stop(t + 0.1);
+  }
+
   // Cartoon spring bounce.
   function boing() {
     const c = ac();
@@ -198,7 +212,7 @@ window.Sfx = (() => {
   }
 
   return {
-    giggle, chime, ping, pop, chomp, purr, tune, whee, boing,
+    giggle, chime, ping, pop, chomp, purr, tune, whee, boing, tick,
     setVolume: (v) => {
       volume = v;
       if (master) master.gain.value = v * 0.65;

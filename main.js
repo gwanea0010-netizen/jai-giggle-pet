@@ -865,10 +865,11 @@ function flyWindow(target, vx, vy, opts = {}) {
   const minX = left - w * 0.2;
   const maxX = right - w * 0.8;
   const minY = Math.min(...areas.map((a) => a.y)) - h * 0.35;
-  const G = 1.1;
+  const G = 0.9; // a bit floaty, for long arcs
+  const WALL_KEEP = 0.72; // speed kept after hitting a side edge
   let [x, y] = target.getPosition();
-  vx = Math.max(-80, Math.min(80, Number(vx) || 0));
-  vy = Math.max(-80, Math.min(80, Number(vy) || 0));
+  vx = Math.max(-130, Math.min(130, Number(vx) || 0));
+  vy = Math.max(-130, Math.min(130, Number(vy) || 0));
   const startArea = areaAt(areas, x + w / 2, y + h / 2);
   let bounces = 0;
   let frames = 0;
@@ -899,7 +900,7 @@ function flyWindow(target, vx, vy, opts = {}) {
         return;
       }
       x = side === 'left' ? minX : maxX;
-      vx = -vx * 0.6;
+      vx = -vx * WALL_KEEP;
       bounces++;
       if (opts.onBounce) opts.onBounce();
     }
