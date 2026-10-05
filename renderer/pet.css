@@ -296,6 +296,16 @@
 @keyframes snowFall { 0% { opacity: 0; transform: translate(0, -8px) rotate(0); } 15% { opacity: 1; } 100% { opacity: 0; transform: translate(10px, 150px) rotate(180deg); } }
 @keyframes lightning { 0%, 90%, 92%, 95%, 100% { opacity: 0; } 91%, 94% { opacity: .7; } }
 
+/* gift carried on a visit */
+.p-held { display: none; }
+.pet.has-gift .p-held { display: inline; animation: giftBob 1.2s ease-in-out infinite alternate; }
+.p-held-glow { fill: #fff6cf; stroke: #ffd23f; stroke-width: 2; opacity: .9; }
+.p-held-emoji { font-size: 22px; }
+@keyframes giftBob { from { transform: translateY(0); } to { transform: translateY(-4px); } }
+
+/* away on a visit: only the card (bubble) shows */
+#stage.away #pet-wrap { opacity: 0; pointer-events: none; }
+
 /* walking direction */
 .pet { transition: transform .2s; }
 .pet.face-left { transform: scaleX(-1); }

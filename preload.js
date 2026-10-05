@@ -25,6 +25,8 @@ contextBridge.exposeInMainWorld('pet', {
   onGuestEvent: on('guest-event'),
   guestLeave: () => ipcRenderer.send('guest:leave'),
   guestPoke: () => ipcRenderer.send('guest:poke'),
+  guestAccept: () => ipcRenderer.send('guest:accept'),
+  recallPet: () => ipcRenderer.send('visit:recall'),
   onWeather: on('weather'),
   weatherRefresh: () => ipcRenderer.invoke('weather:refresh'),
   weatherGet: () => ipcRenderer.invoke('weather:get'),

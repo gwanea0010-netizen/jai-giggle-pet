@@ -115,7 +115,7 @@ create table if not exists public.pet_visits (
   team_id     uuid not null references public.pet_teams(id) on delete cascade,
   from_member uuid not null,
   to_member   uuid not null,
-  kind        text not null,                  -- 'visit' | 'return' | 'poke' | 'msg'
+  kind        text not null,                  -- visit | return | poke | msg | flyby | recall | thanks
   payload     jsonb not null default '{}'::jsonb,
   created_at  timestamptz not null default now()
 );
@@ -135,7 +135,7 @@ begin
   if t is null then
     raise exception 'invalid team code' using errcode = '28000';
   end if;
-  if p_kind not in ('visit', 'return', 'poke', 'msg') then
+  if p_kind not in ('visit', 'return', 'poke', 'msg', 'flyby', 'recall', 'thanks') then
     raise exception 'unknown message kind';
   end if;
   if octet_length(coalesce(p_payload, '{}'::jsonb)::text) > 4000 then

@@ -153,10 +153,18 @@
         <ol class="board" id="board"></ol>
         <div class="neighbors">
           <h3>🪑 Desk neighbors</h3>
-          <p class="hint">Who sits next to you? Slingshot your pet hard off that side of your screen and it flies onto their screen, says hi, and comes back. They need the pet running too.</p>
+          <p class="hint">Add the people sitting on each side, <b>nearest first</b>. Slingshot your pet off that side: a soft throw lands on the 1st desk, 🔥 a strong one on the 2nd, 💥 MAX on the 3rd (it zooms past the ones in between). Pick a 🎁 gift from the right-click menu to send along. They need the pet running too.</p>
           <div class="grid2">
-            <label class="field"><span>⬅️ Sits on my left</span><select id="nb-left"></select></label>
-            <label class="field"><span>Sits on my right ➡️</span><select id="nb-right"></select></label>
+            <div class="nb-col">
+              <span class="nb-title">⬅️ On my left</span>
+              <ol class="nb-list" id="nb-left-list"></ol>
+              <select id="nb-left-add"></select>
+            </div>
+            <div class="nb-col">
+              <span class="nb-title">On my right ➡️</span>
+              <ol class="nb-list" id="nb-right-list"></ol>
+              <select id="nb-right-add"></select>
+            </div>
           </div>
         </div>
         <div class="status-row board-foot">

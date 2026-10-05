@@ -350,6 +350,9 @@
     <path d="M24 154 q-3 -5 0 -10 q3 -5 0 -10 M32 154 q-3 -5 0 -10 q3 -5 0 -10" class="p-steam"/>
   </g>
 
+  <!-- gift carried on a visit (emoji set from JS) -->
+  <g class="p-held"><circle cx="30" cy="150" r="17" class="p-held-glow"/><text x="30" y="159" text-anchor="middle" class="p-held-emoji"></text></g>
+
   <rect class="p-flash" x="-20" y="-20" width="240" height="240"/>
 
   <!-- props (stay on the ground) -->

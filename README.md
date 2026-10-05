@@ -124,7 +124,12 @@ Right-click the pet → **Message a teammate** (or the 💬 next to a name on th
 
 ### 🪑 Visit a teammate's screen
 
-In the Team tab, pick who sits on your **left** and **right**. Then slingshot your pet hard off that side of your screen: it flies out, lands on your neighbor's screen and says hi ("👋 Hi Rahul! I'm KITTY, Jai's pet"). They can tickle it (you'll hear about it) or double-click to send it back; otherwise it flies home by itself after 30 seconds ("🏠 I'm back! Rahul says hi"). If your neighbor's pet is offline, yours just bounces off the edge.
+In the Team tab, add the people sitting on your **left** and **right**, nearest first (up to 5 per side). Then slingshot your pet off that side of your screen:
+
+- **Soft throw** → the 1st desk · **🔥 strong** → the 2nd · **💥 MAX** → the 3rd. It zooms across the screens in between ("💨 Whoa, Jai's KITTY just zoomed past!") and lands on the target's screen: "👋 Hi Rahul! I'm KITTY"
+- **🎁 Gifts:** right-click → *Gift for next visit* → 💐 flowers, ☕ chai, 🍪 cookie, 🍫 chocolate, 🎂 cake, ❤️ heart, 🏆 trophy, 🎈 balloon, or one of **your accessories**. Your pet carries it in its hand; your teammate presses **Accept 💝** (accessories unlock for them and they wear it), and you get "💝 Rahul loved your gift!"
+- **🏠 Call back:** while your pet is away, a small card stays on your screen with a **Call back** button. Otherwise it comes home by itself after 30 seconds ("🏠 I'm back! Rahul says hi")
+- Your teammate can tickle it (you'll hear about it) or double-click to send it back. If everyone in that direction is offline, your pet just bounces off the edge.
 
 Works with the Supabase team (messages go through the `pet_send` / `pet_inbox` functions, guarded by the team code and a flood limit) or the shared-folder team.
 

@@ -35,7 +35,8 @@
       snacks: ach.snacks || 0,
       pats: ach.pats || 0,
       codeChecks: ach.codeChecks || 0,
-      festivals: (collected || []).length,
+      // only festival outfits count (not accessories a teammate gifted)
+      festivals: (collected || []).filter((id) => ['kurta', 'diya', 'holi', 'santa', 'gift', 'stars', 'flag'].includes(id)).length,
       projectsToday: (ach.projects || []).length,
     };
   }

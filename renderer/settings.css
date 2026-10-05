@@ -209,6 +209,18 @@ h3 { font-size: 13.5px; margin: 14px 0 6px; }
 .chat-btn { margin-left: 8px; padding: 1px 7px; font-size: 12px; border-radius: 99px; vertical-align: middle; }
 .neighbors { margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--line); }
 .neighbors h3 { margin-top: 0; }
+.nb-col { display: grid; gap: 6px; align-content: start; }
+.nb-title { font-size: 12.5px; color: var(--muted); font-weight: 600; }
+.nb-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.nb-list li {
+  display: flex; align-items: center; gap: 6px; padding: 5px 8px; border-radius: 9px;
+  background: var(--field); border: 1px solid var(--line); font-size: 13px;
+}
+.nb-list li .n { color: var(--muted); font-weight: 800; width: 16px; }
+.nb-list li .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nb-list li .reach { font-size: 11px; color: var(--muted); }
+.nb-list li button { padding: 1px 6px; font-size: 11px; border-radius: 6px; }
+.nb-list li.off .nm { opacity: .6; }
 #mode-cloud, #mode-folder { display: grid; gap: 10px; }
 #mode-cloud[hidden], #mode-folder[hidden] { display: none; }
 .cloud-fields { display: grid; gap: 10px; }

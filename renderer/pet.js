@@ -454,7 +454,8 @@
 
   // ---------- events from Claude Code / menus ----------
   let payloadFrom = '';
-  window.pet.onEvent(({ state: ev, project, session = 'default', detail, count, sub, from }) => {
+  let awayMode = false; // our pet is on a teammate's screen
+  window.pet.onEvent(({ state: ev, project, session = 'default', detail, count, sub, from, acc }) => {
     payloadFrom = from || '';
     lastActivity = Date.now();
     if (project) lastProject = project;
@@ -507,7 +508,49 @@
       case 'visit-offline':
         showBubble(`😴 ${detail} is offline, so I bounced back!`, { sub: '🪑 Desk neighbor', cls: 'tip', ms: 3500 });
         break;
+      case 'away': {
+        // our pet left for a teammate's screen: the window becomes a small card with Call back
+        awayMode = false;
+        showBubble(
+          `<div>🛫 <b>${esc(S.petName)}</b> is visiting <b>${esc(detail)}</b>${sub ? ` with ${esc(sub)}` : ''}</div>
+           <button class="vbig" data-recall="1">🏠 Call back</button>`,
+          { sub: '✈️ On a visit', cls: 'vault-bubble', html: true, sticky: true }
+        );
+        awayMode = true;
+        document.getElementById('stage').classList.add('away');
+        setState('idle');
+        stopTrail();
+        setInteractive(false);
+        break;
+      }
+      case 'recalling':
+        awayMode = false;
+        showBubble(`📞 Calling ${esc(S.petName)} back from ${esc(detail)}…`, { sub: '✈️ On a visit', cls: 'vault-bubble', html: true, sticky: true });
+        awayMode = true;
+        break;
+      case 'thanks':
+        showBubble(`💝 ${detail} loved your ${sub || 'gift'}!`, { sub: '🎁 Gift delivered', cls: 'tip', ms: 5000 });
+        hearts();
+        play('chime');
+        break;
+      case 'gift-received':
+        setState('done');
+        setLook('happy', 'grin');
+        showBubble(acc ? `🎁 ${sub} gave me ${detail}! Wearing it now ✨` : `🎁 ${sub} sent me ${detail}!`, { sub: '💝 Gift', cls: 'tip', ms: 5000 });
+        hearts();
+        burstConfetti(60);
+        play('chime');
+        after(4500, settle);
+        break;
+      case 'flyby-seen':
+        if (state === 'idle' || state === 'music') setLook('open', 'o');
+        showBubble(`💨 Whoa! ${detail} just zoomed past!`, { cls: 'tip', ms: 3000 });
+        setTimeout(() => state === 'idle' && setLook('open', 'smile'), 1500);
+        break;
       case 'home':
+        awayMode = false;
+        document.getElementById('stage').classList.remove('away');
+        hideBubble();
         homeFrom = detail || '';
         setState('fly');
         setLook('happy', 'grin');
@@ -661,6 +704,10 @@
       hideBubble();
       window.pet.openVault();
     }
+    if (e.target.closest('[data-recall]')) {
+      window.pet.recallPet();
+      return;
+    }
     const reply = e.target.closest('[data-chat-reply]');
     if (reply) {
       hideBubble();
@@ -721,11 +768,23 @@
     after(4600, settle);
   }
 
+  // The gift chosen for the next visit, held in the pet's hand.
+  function applyHeldGift() {
+    const g = PET_ACCESSORIES.giftInfo(S.visitGift);
+    pet.classList.toggle('has-gift', !!g);
+    pet.querySelector('.p-held-emoji').textContent = g ? g.emoji : '';
+  }
+
   function applySettings(next) {
     const prevSpecies = S.species;
     S = { ...S, ...next };
     pet.dataset.species = S.species;
     if (next.equipped) applyWardrobe();
+    if ('visitGift' in next) {
+      applyHeldGift();
+      const g = PET_ACCESSORIES.giftInfo(next.visitGift);
+      if (g && booted) showBubble(`${g.emoji} I'll take ${g.name} on my next visit!`, { sub: '🎁 Gift ready', cls: 'tip', ms: 3500 });
+    }
     if ('dayNight' in next && booted) applySky();
     document.documentElement.style.setProperty('--s', S.scale);
     Sfx.setVolume(S.volume);
@@ -1239,7 +1298,8 @@
     return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   }
 
-  function showBubble(text, { sub = '', ms = 3000, sticky = false, cls = '', html = false } = {}) {
+  function showBubble(text, { sub = '', ms = 3000, sticky = false, cls = '', html = false, force = false } = {}) {
+    if (awayMode && !force) return; // while visiting, the window only shows the "away" card
     clearTimeout(bubbleTimer);
     if (html) bubbleText.innerHTML = text;
     else bubbleText.textContent = text;
@@ -1249,6 +1309,7 @@
   }
 
   function hideBubble() {
+    if (awayMode) return;
     clearTimeout(bubbleTimer);
     bubble.classList.remove('show');
   }

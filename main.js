@@ -10,7 +10,7 @@ const readline = require('readline');
 const { spawn } = require('child_process');
 
 const SPECIES = require('./renderer/species.js');
-const { ACCESSORIES, activeFestival, isUnlocked } = require('./renderer/accessories.js');
+const { ACCESSORIES, activeFestival, isUnlocked, giftInfo } = require('./renderer/accessories.js');
 const updater = require('./lib/updater.js');
 const { Vault, generatePassword } = require('./lib/vault.js');
 const hooks = require('./scripts/install-hooks.js');
@@ -31,6 +31,20 @@ if (process.argv.includes('--uninstall-hooks')) {
   try { hooks.remove(HOOK_COMMAND); } catch { /* nothing to clean */ }
   process.exit(0);
 }
+
+// Never show the "JavaScript error occurred in the main process" dialog to users:
+// log the error (to %APPDATA%\Giggles Pet\error.log) and keep the pet running.
+function logError(err) {
+  try {
+    const file = path.join(app.getPath('userData'), 'error.log');
+    if (fs.existsSync(file) && fs.statSync(file).size > 512 * 1024) fs.renameSync(file, `${file}.old`);
+    fs.appendFileSync(file, `[${new Date().toISOString()}] v${app.getVersion()} ${(err && err.stack) || err}\n`);
+  } catch {
+    // nothing else we can do
+  }
+}
+process.on('uncaughtException', logError);
+process.on('unhandledRejection', logError);
 
 const PORT = Number(process.env.GIGGLES_PORT) || 47321;
 const ICON = nativeImage.createFromPath(path.join(__dirname, 'assets', 'cyborg-erp-logo.jpg'));
@@ -80,8 +94,10 @@ const DEFAULTS = {
   cloudUrl: '',
   cloudKey: '',
   teamCode: '',
-  neighborLeft: '', // member id of the teammate sitting to your left (pet visits)
-  neighborRight: '',
+  // Teammates sitting to your left / right, nearest first. A harder slingshot reaches further down the row.
+  neighborsLeft: [],
+  neighborsRight: [],
+  visitGift: '', // "treat:flowers" / "acc:crown": carried on the next visit, then cleared
   badges: [],
   memberId: '',
   hooksWanted: true,
@@ -97,7 +113,7 @@ const DEFAULTS = {
 };
 const VAULT_LOCK_OPTIONS = ['manual', 'winlock', '5', '15', '60'];
 const EDITABLE = ['ownerName', 'petName', 'species', 'scale', 'sound', 'volume', 'notifications', 'roam', 'media', 'tipsEvery', 'startWithWindows', 'teamFolder', 'updateSource', 'autoUpdate', 'codeHelper', 'vaultAutoLock', 'vaultHints',
-  'teamMode', 'cloudUrl', 'cloudKey', 'teamCode', 'weatherCity', 'dayNight', 'neighborLeft', 'neighborRight'];
+  'teamMode', 'cloudUrl', 'cloudKey', 'teamCode', 'weatherCity', 'dayNight', 'visitGift'];
 const PUBLIC_KEYS = ['ownerName', 'petName', 'species', 'equipped', 'teamFolder', 'teamMode', 'teamCode'];
 const LONG_TEXT = { teamFolder: 500, updateSource: 500, cloudUrl: 300, cloudKey: 2000, teamCode: 120, weatherCity: 80 };
 
@@ -123,6 +139,14 @@ function loadSettings() {
   settings.collected = Array.isArray(settings.collected) ? settings.collected : [];
   settings.badges = Array.isArray(settings.badges) ? settings.badges : [];
   if (!settings.teamMode && settings.teamFolder) settings.teamMode = 'folder'; // pre-3.7 shared-folder teams
+  // pre-3.11: one neighbor per side
+  for (const [oldKey, newKey] of [['neighborLeft', 'neighborsLeft'], ['neighborRight', 'neighborsRight']]) {
+    if (!Array.isArray(settings[newKey])) settings[newKey] = [];
+    if (settings[oldKey]) {
+      if (!settings[newKey].length) settings[newKey] = [settings[oldKey]];
+      delete settings[oldKey];
+    }
+  }
   // An update we tried to install is now running: forget the attempt.
   if (settings.updateAttempt && updater.compare(app.getVersion(), settings.updateAttempt.version) >= 0) {
     delete settings.updateAttempt;
@@ -166,8 +190,16 @@ function sanitize(patch) {
     out.equipped = eq;
   }
   if ('vaultAutoLock' in out && !VAULT_LOCK_OPTIONS.includes(out.vaultAutoLock)) delete out.vaultAutoLock;
-  for (const k of ['neighborLeft', 'neighborRight']) {
-    if (k in patch) out[k] = /^[0-9a-f-]{36}$/i.test(String(patch[k] || '')) ? String(patch[k]) : '';
+  for (const k of ['neighborsLeft', 'neighborsRight']) {
+    if (!(k in patch)) continue;
+    const ids = (Array.isArray(patch[k]) ? patch[k] : []).map(String).filter((id) => /^[0-9a-f-]{36}$/i.test(id));
+    out[k] = [...new Set(ids)].filter((id) => id !== settings.memberId).slice(0, 5);
+  }
+  if ('visitGift' in out) {
+    const g = giftInfo(out.visitGift);
+    // you can only give accessories you own
+    const owned = g && (g.kind === 'treat' || isUnlocked(ACCESSORIES.find((a) => a.id === g.id), settings.stats.total, settings.collected));
+    out.visitGift = owned ? out.visitGift : '';
   }
   if ('scale' in out) out.scale = Math.min(1.5, Math.max(0.45, out.scale));
   if ('volume' in out) out.volume = Math.min(1, Math.max(0, out.volume));
@@ -444,7 +476,7 @@ async function readBoard() {
 
 // Keep "who's online" fresh while desk neighbors are set (visits only go to online pets).
 setInterval(() => {
-  if (teamBackend() && (settings.neighborLeft || settings.neighborRight)) readBoard().catch(() => {});
+  if (teamBackend() && (settings.neighborsLeft.length || settings.neighborsRight.length)) readBoard().catch(() => {});
 }, 60 * 1000);
 
 let lastRank = null;
@@ -827,7 +859,7 @@ ipcMain.on('walk', (_e, dx) => {
     let nx = x + dir * 2;
     const arrived = dir > 0 ? nx >= target : nx <= target;
     if (arrived) nx = target;
-    win.setPosition(nx, y);
+    safeSetPosition(win, nx, y);
     if (arrived) {
       stopWalk();
       broadcast('walk-done');
@@ -841,6 +873,7 @@ let flyTimer = null;
 
 // The work area under x (stacked monitors: the one at this height, else the next one down).
 function areaAt(areas, x, y) {
+  if (!areas.length || !Number.isFinite(x)) return screen.getPrimaryDisplay().workArea;
   const col = areas.filter((a) => x >= a.x && x < a.x + a.width);
   if (!col.length) {
     // in a gap between monitors: use the horizontally nearest one
@@ -852,6 +885,19 @@ function areaAt(areas, x, y) {
   return col.find((a) => y >= a.y && y < a.y + a.height)
     || col.filter((a) => a.y >= y).sort((p, q) => p.y - q.y)[0]
     || col[col.length - 1];
+}
+
+// setPosition throws ("conversion failure") on NaN / Infinity / huge values; never let a
+// bad frame crash the app.
+function safeSetPosition(target, x, y) {
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+  const clamp = (v) => Math.round(Math.max(-100000, Math.min(100000, v)));
+  try {
+    target.setPosition(clamp(x), clamp(y));
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 // Flies a pet window with gravity across all monitors, bouncing off the outer edges.
@@ -884,7 +930,7 @@ function flyWindow(target, vx, vy, opts = {}) {
 
     if (exiting) {
       // keep flying until it's completely off the outer edge
-      target.setPosition(Math.round(x), Math.round(Math.min(y, minY + 4000)));
+      safeSetPosition(target, x, Math.min(y, minY + 4000));
       if ((exiting === 'left' && x < left - w) || (exiting === 'right' && x > right) || frames > 900) {
         clearInterval(timer);
         const area = areaAt(areas, Math.min(Math.max(x, left), right - 1), y + h / 2);
@@ -922,7 +968,12 @@ function flyWindow(target, vx, vy, opts = {}) {
       vx *= 0.82; // ground friction
     }
 
-    target.setPosition(Math.round(x), Math.round(y));
+    if (!safeSetPosition(target, x, y)) {
+      // something produced a bad position: stop this flight and land where it's safe
+      frames = 10000;
+      x = Number.isFinite(x) ? x : target.getPosition()[0];
+      grounded = true;
+    }
 
     if ((grounded && Math.abs(vx) < 0.6) || frames > 900) {
       clearInterval(timer);
@@ -945,10 +996,13 @@ function flyWindow(target, vx, vy, opts = {}) {
   return timer;
 }
 
+let launchBounds = null; // where the pet was when flung (the "away" card waits there)
+
 ipcMain.on('fling', (_e, { vx, vy }) => {
   if (!win || away) return;
   stopWalk();
   clearInterval(flyTimer);
+  launchBounds = win.getBounds();
   win.setIgnoreMouseEvents(true, { forward: true });
   flyTimer = flyWindow(win, vx, vy, {
     onBounce: () => broadcast('fly-bounce'),
@@ -967,12 +1021,14 @@ ipcMain.on('fling', (_e, { vx, vy }) => {
 
 // ---------- visits: fling your pet onto a teammate's screen ----------
 let away = null; // { to, toName, side, timer } while our pet is visiting someone
-const guests = new Map(); // webContents id -> { win, from, enteredFrom, payload }
+const guests = new Map(); // webContents id -> { win, from, enteredFrom, payload, flyby }
 let boardCache = [];
 let lastOfflineNote = 0;
+let visitPlan = null; // { to, via: [ids it zooms past on the way] }
 const VISIT_SPEED = 18; // px/frame needed to leave through the edge
+const HOP_DELAY = 1400; // ms per screen it zooms across before arriving
 
-const neighborFor = (side) => (side === 'left' ? settings.neighborLeft : settings.neighborRight);
+const neighborsFor = (side) => (side === 'left' ? settings.neighborsLeft : settings.neighborsRight) || [];
 const memberName = (id) => (boardCache.find((m) => m.id === id) || {}).ownerName || 'your teammate';
 const isOnline = (id) => boardCache.some((m) => m.id === id && Date.now() - m.updatedAt < 5 * 60 * 1000);
 
@@ -980,41 +1036,75 @@ function sendTeamMessage(to, kind, payload) {
   const be = teamBackend();
   if (!be) return Promise.reject(new Error('no team'));
   if (be.kind === 'cloud') return teamcloud.send(be.cfg, settings.memberId, to, kind, payload);
-  team.send(be.folder, settings.memberId, to, kind, payload);
-  return Promise.resolve();
+  try {
+    team.send(be.folder, settings.memberId, to, kind, payload);
+    return Promise.resolve();
+  } catch (err) {
+    return Promise.reject(err); // never throw: callers rely on .catch()
+  }
 }
 
 // Called by the flight when the pet hits the left/right outer edge.
+// Harder throws reach further down the row: <45 px/frame -> 1st desk, <80 -> 2nd, else 3rd+.
 function canVisit(side, speed) {
-  const to = neighborFor(side);
-  if (!to || away || speed < VISIT_SPEED || !teamBackend()) return false;
-  if (!isOnline(to)) {
+  const row = neighborsFor(side);
+  if (!row.length || away || speed < VISIT_SPEED || !teamBackend()) return false;
+  const reach = Math.min(speed < 45 ? 0 : speed < 80 ? 1 : 2, row.length - 1);
+  let target = -1;
+  for (let i = reach; i >= 0; i--) if (isOnline(row[i])) { target = i; break; } // nearest online at or before reach
+  if (target < 0) {
     if (Date.now() - lastOfflineNote > 15000) {
       lastOfflineNote = Date.now();
-      broadcast('pet-event', { state: 'visit-offline', detail: memberName(to) });
+      broadcast('pet-event', { state: 'visit-offline', detail: memberName(row[0]) });
     }
     return false;
   }
+  visitPlan = { to: row[target], via: row.slice(0, target).filter(isOnline) };
   return true;
 }
 
-function startVisit(side, motion) {
-  const to = neighborFor(side);
-  away = { to, toName: memberName(to), side };
-  win.hide();
-  sendTeamMessage(to, 'visit', {
-    side,
-    vx: motion.vx,
-    vy: motion.vy,
-    yFrac: motion.yFrac,
+function petLook() {
+  return {
     petName: settings.petName,
     ownerName: settings.ownerName || 'A teammate',
     species: settings.species,
     equipped: settings.equipped,
-  }).catch(() => returnHome(null)); // couldn't send: come straight back
+  };
+}
+
+function startVisit(side, motion) {
+  const { to, via } = visitPlan || { to: neighborsFor(side)[0], via: [] };
+  visitPlan = null;
+  away = { to, toName: memberName(to), side };
+  // The pet's window waits at its old spot as a small "away" card with a Call back button.
+  if (launchBounds) win.setBounds(launchBounds);
+  const gift = giftInfo(settings.visitGift);
+  broadcast('pet-event', { state: 'away', detail: away.toName, sub: gift ? `${gift.emoji} ${gift.name}` : '' });
+
+  const motionInfo = { side, vx: motion.vx, vy: motion.vy, yFrac: motion.yFrac };
+  via.forEach((id, i) => {
+    sendTeamMessage(id, 'flyby', { ...motionInfo, ...petLook(), delay: i * HOP_DELAY }).catch(() => {});
+  });
+  sendTeamMessage(to, 'visit', {
+    ...motionInfo,
+    ...petLook(),
+    delay: via.length * HOP_DELAY,
+    gift: gift ? { kind: gift.kind, id: gift.id } : null,
+  })
+    .then(() => { if (gift) updateSettings({ visitGift: '' }); }) // the gift is delivered once
+    .catch(() => returnHome(null)); // couldn't send: come straight back
   // Safety net: come home even if the other pet never answers.
   away.timer = setTimeout(() => returnHome(null), 60 * 1000);
 }
+
+// "🏠 Call back": ask the host to send our pet home now (or come back anyway in a few seconds).
+ipcMain.on('visit:recall', () => {
+  if (!away) return;
+  clearTimeout(away.timer);
+  broadcast('pet-event', { state: 'recalling', detail: away.toName });
+  sendTeamMessage(away.to, 'recall', {}).catch(() => {});
+  away.timer = setTimeout(() => returnHome(null), 10 * 1000);
+});
 
 // Our pet flies back in through the edge it left from.
 function returnHome(byName) {
@@ -1029,9 +1119,9 @@ function returnHome(byName) {
   const { w, h } = petSize(settings.scale);
   const x = side === 'left' ? edge.x - w : edge.x + edge.width;
   const y = Math.round(edge.y + edge.height * 0.25);
+  broadcast('pet-event', { state: 'home', detail: byName || '' });
   win.setBounds({ x, y, width: w, height: h });
   win.showInactive();
-  broadcast('pet-event', { state: 'home', detail: byName || '' });
   clearInterval(flyTimer);
   flyTimer = flyWindow(win, side === 'left' ? 30 : -30, -12, {
     onBounce: () => broadcast('fly-bounce'),
@@ -1044,11 +1134,13 @@ function returnHome(byName) {
 }
 
 // A teammate's pet arrives on our screen as a guest window.
-function spawnGuest(from, p) {
-  if (guests.size >= 3) {
+// flyby = true: it just zooms across our screen on its way to someone further down the row.
+function spawnGuest(from, p, flyby = false) {
+  if ([...guests.values()].filter((g) => !g.flyby).length >= 3 && !flyby) {
     sendTeamMessage(from, 'return', { byName: settings.ownerName || 'A teammate' }).catch(() => {});
     return;
   }
+  const gift = !flyby && p.gift ? giftInfo(`${p.gift.kind}:${p.gift.id}`) : null;
   const enteredFrom = p.side === 'right' ? 'left' : 'right'; // they threw it right -> it comes in on our left
   const areas = screen.getAllDisplays().map((d) => d.workArea);
   const edge = enteredFrom === 'left'
@@ -1073,7 +1165,7 @@ function spawnGuest(from, p) {
   gw.setAlwaysOnTop(true, 'screen-saver');
   gw.setIgnoreMouseEvents(true, { forward: true });
   const id = gw.webContents.id;
-  guests.set(id, { win: gw, from, enteredFrom, payload: p });
+  guests.set(id, { win: gw, from, enteredFrom, payload: p, flyby, gift });
   gw.on('closed', () => guests.delete(id));
   gw.loadFile(path.join(__dirname, 'renderer', 'guest.html'));
   gw.webContents.once('did-finish-load', () => {
@@ -1086,16 +1178,49 @@ function spawnGuest(from, p) {
       scale: settings.scale,
       sound: settings.sound,
       volume: settings.volume,
+      flyby,
+      gift,
     });
     gw.showInactive();
+    const close = () => !gw.isDestroyed() && gw.close();
+    if (flyby) {
+      // zoom straight across and out the other side
+      flyWindow(gw, enteredFrom === 'left' ? 75 : -75, -9, {
+        exit: (side) => side !== enteredFrom,
+        onExit: close,
+        onDone: close,
+      });
+      return;
+    }
     const speed = Math.min(60, Math.max(22, Math.abs(Number(p.vx) || 30)));
     flyWindow(gw, enteredFrom === 'left' ? speed : -speed, Math.max(-25, Math.min(5, Number(p.vy) || -8)), {
       onBounce: () => !gw.isDestroyed() && gw.webContents.send('guest-event', 'bounce'),
       onDone: () => !gw.isDestroyed() && gw.webContents.send('guest-event', 'landed'),
     });
   });
-  broadcast('pet-event', { state: 'guest-arrived', detail: `${p.ownerName || 'A teammate'}'s ${p.petName || 'pet'}` });
+  const who = `${String(p.ownerName || 'A teammate').slice(0, 40)}'s ${String(p.petName || 'pet').slice(0, 40)}`;
+  broadcast('pet-event', flyby ? { state: 'flyby-seen', detail: who } : { state: 'guest-arrived', detail: who });
 }
+
+// The host accepts the gift a guest brought.
+ipcMain.on('guest:accept', (e) => {
+  const g = guestOf(e);
+  if (!g || !g.gift || g.giftTaken) return;
+  g.giftTaken = true;
+  const gift = g.gift;
+  const fromName = String(g.payload.ownerName || 'A teammate').slice(0, 40);
+  if (gift.kind === 'acc') {
+    // A gifted accessory is yours to keep: unlock it and put it on.
+    if (!settings.collected.includes(gift.id)) settings.collected = [...settings.collected, gift.id];
+    settings.equipped = { ...settings.equipped, [gift.slot]: gift.id };
+    saveSettings();
+    broadcast('settings', { equipped: settings.equipped, collected: settings.collected });
+    if (settingsWin && !settingsWin.isDestroyed()) settingsWin.webContents.send('settings', settings);
+    publishTeam();
+  }
+  broadcast('pet-event', { state: 'gift-received', detail: `${gift.emoji} ${gift.name}`, sub: fromName, acc: gift.kind === 'acc' });
+  sendTeamMessage(g.from, 'thanks', { byName: settings.ownerName || 'A teammate', gift: `${gift.emoji} ${gift.name}` }).catch(() => {});
+});
 
 // The guest flies back out the way it came, then tells its owner to bring it home.
 function sendGuestHome(g) {
@@ -1222,7 +1347,14 @@ setInterval(async () => {
     const msgs = be.kind === 'cloud' ? await teamcloud.inbox(be.cfg, settings.memberId) : team.inbox(be.folder, settings.memberId);
     for (const m of msgs) {
       const p = m.payload || {};
-      if (m.kind === 'visit') spawnGuest(m.from, p);
+      const delay = Math.min(8000, Math.max(0, Number(p.delay) || 0)); // after it zoomed past the desks in between
+      if (m.kind === 'visit') setTimeout(() => spawnGuest(m.from, p), delay);
+      else if (m.kind === 'flyby') setTimeout(() => spawnGuest(m.from, p, true), delay);
+      else if (m.kind === 'recall') {
+        for (const g of guests.values()) if (g.from === m.from && !g.flyby) sendGuestHome(g);
+      } else if (m.kind === 'thanks') {
+        broadcast('pet-event', { state: 'thanks', detail: String(p.byName || 'Your teammate').slice(0, 40), sub: String(p.gift || '').slice(0, 60) });
+      }
       else if (m.kind === 'return' && away && m.from === away.to) returnHome(String(p.byName || '').slice(0, 40));
       else if (m.kind === 'poke') broadcast('pet-event', { state: 'poked', detail: String(p.byName || 'Someone').slice(0, 40) });
       else if (m.kind === 'msg') receiveChat(m.from, p);
@@ -1250,7 +1382,7 @@ ipcMain.on('move-by', (_e, { dx, dy }) => {
     broadcast('fly-done', {});
   }
   const [x, y] = win.getPosition();
-  win.setPosition(Math.round(x + dx), Math.round(y + dy));
+  safeSetPosition(win, x + Number(dx), y + Number(dy));
 });
 // Drag follows the real cursor position (no accumulated deltas), so the pet
 // stays glued under the mouse even on scaled / mixed-DPI monitors.
@@ -1431,6 +1563,27 @@ ipcMain.on('context-menu', () => {
     { label: 'Team leaderboard 🏆', click: () => openSettings('team') },
     { label: 'Password vault 🔐', click: openVault },
     { label: 'Message a teammate 💬', click: () => openChat() },
+    {
+      label: `Gift for next visit 🎁${settings.visitGift ? ` (${(giftInfo(settings.visitGift) || {}).emoji || ''})` : ''}`,
+      submenu: [
+        { label: 'No gift', type: 'radio', checked: !settings.visitGift, click: () => updateSettings({ visitGift: '' }) },
+        { type: 'separator' },
+        ...require('./renderer/accessories.js').TREATS.map((t) => ({
+          label: `${t.emoji} ${t.name}`,
+          type: 'radio',
+          checked: settings.visitGift === `treat:${t.id}`,
+          click: () => updateSettings({ visitGift: `treat:${t.id}` }),
+        })),
+        { type: 'separator' },
+        { label: 'Give one of your accessories:', enabled: false },
+        ...ACCESSORIES.filter((a) => isUnlocked(a, settings.stats.total, settings.collected)).map((a) => ({
+          label: `${a.emoji} ${a.name}`,
+          type: 'radio',
+          checked: settings.visitGift === `acc:${a.id}`,
+          click: () => updateSettings({ visitGift: `acc:${a.id}` }),
+        })),
+      ],
+    },
     {
       label: 'Size',
       submenu: SIZES.map((s) => ({

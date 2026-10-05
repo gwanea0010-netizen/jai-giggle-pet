@@ -181,16 +181,8 @@
     $('team-folder').className = `status ${t.error ? 'bad' : 'muted'}`;
     $('team-open').hidden = t.mode !== 'folder';
     const members = [...t.members];
-    // desk neighbor pickers
-    const others = t.members.filter((m) => m.id !== t.me);
-    for (const [sel, key] of [['nb-left', 'neighborLeft'], ['nb-right', 'neighborRight']]) {
-      if (document.activeElement === $(sel)) continue;
-      const current = S[key] || '';
-      $(sel).innerHTML = '<option value="">— nobody —</option>' + others
-        .map((m) => `<option value="${esc(m.id)}"${m.id === current ? ' selected' : ''}>${esc(m.ownerName)} (${esc(m.petName)})</option>`)
-        .join('');
-      if (current && !others.some((m) => m.id === current)) $(sel).insertAdjacentHTML('beforeend', `<option value="${esc(current)}" selected>(not active lately)</option>`);
-    }
+    teamMembers = t.members.filter((m) => m.id !== t.me);
+    renderNeighbors();
     if (boardMode === 'total') members.sort((a, b) => b.total - a.total);
     const list = $('board');
     list.innerHTML = '';
@@ -223,8 +215,46 @@
   }
 
   $('team-pick').addEventListener('click', async () => { await api.teamPick(); refreshTeam(); });
-  $('nb-left').addEventListener('change', () => save({ neighborLeft: $('nb-left').value }));
-  $('nb-right').addEventListener('change', () => save({ neighborRight: $('nb-right').value }));
+  // ---------- desk neighbors: a row per side, nearest first ----------
+  let teamMembers = [];
+  const REACH = ['soft throw', '🔥 strong', '💥 MAX'];
+  function renderNeighbors() {
+    const name = (id) => {
+      const m = teamMembers.find((x) => x.id === id);
+      return m ? `${m.ownerName} (${m.petName})` : '(not active lately)';
+    };
+    const used = new Set([...(S.neighborsLeft || []), ...(S.neighborsRight || [])]);
+    for (const [side, key] of [['left', 'neighborsLeft'], ['right', 'neighborsRight']]) {
+      const ids = S[key] || [];
+      const list = $(`nb-${side}-list`);
+      list.innerHTML = ids.length ? '' : '<li class="off"><span class="nm">Nobody yet</span></li>';
+      ids.forEach((id, i) => {
+        const li = document.createElement('li');
+        if (!teamMembers.some((m) => m.id === id)) li.className = 'off';
+        li.innerHTML = `<span class="n">${i + 1}</span><span class="nm">${esc(name(id))}</span><span class="reach">${REACH[Math.min(i, 2)]}</span>
+          ${i > 0 ? '<button data-up title="Move closer">↑</button>' : ''}<button data-del title="Remove">✕</button>`;
+        li.querySelector('[data-del]').addEventListener('click', () => save({ [key]: ids.filter((x) => x !== id) }));
+        const up = li.querySelector('[data-up]');
+        if (up) up.addEventListener('click', () => {
+          const next = [...ids];
+          [next[i - 1], next[i]] = [next[i], next[i - 1]];
+          save({ [key]: next });
+        });
+        list.appendChild(li);
+      });
+      const add = $(`nb-${side}-add`);
+      const free = teamMembers.filter((m) => !used.has(m.id));
+      add.innerHTML = `<option value="">+ Add ${side === 'left' ? 'left' : 'right'} neighbor…</option>` +
+        free.map((m) => `<option value="${esc(m.id)}">${esc(m.ownerName)} (${esc(m.petName)})</option>`).join('');
+      add.disabled = !free.length || ids.length >= 5;
+    }
+  }
+  for (const [side, key] of [['left', 'neighborsLeft'], ['right', 'neighborsRight']]) {
+    $(`nb-${side}-add`).addEventListener('change', (e) => {
+      const id = e.target.value;
+      if (id) save({ [key]: [...(S[key] || []), id] });
+    });
+  }
   $('team-change').addEventListener('click', async () => {
     await api.teamLeave(); // back to the setup card to pick Supabase or another folder
     refreshTeam();
@@ -305,6 +335,7 @@
     $('stat-total').textContent = (S.stats && S.stats.total) || 0;
     renderWardrobe();
     renderBadges();
+    renderNeighbors();
   }
 
   async function save(patch) {

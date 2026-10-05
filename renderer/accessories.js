@@ -54,10 +54,37 @@
     return null;
   }
 
+  // `collected` holds festival items and accessories a teammate gifted you.
   const isUnlocked = (item, total, collected = []) =>
-    item.festival ? collected.includes(item.id) : total >= item.unlock;
+    collected.includes(item.id) || (!item.festival && total >= item.unlock);
 
-  const api = { ACCESSORIES, SLOTS, FESTIVALS, activeFestival, isUnlocked };
+  // Small treats a pet can carry to a teammate's screen.
+  const TREATS = [
+    { id: 'flowers', emoji: '💐', name: 'Flowers' },
+    { id: 'chai', emoji: '☕', name: 'Chai' },
+    { id: 'cookie', emoji: '🍪', name: 'Cookie' },
+    { id: 'chocolate', emoji: '🍫', name: 'Chocolate' },
+    { id: 'cake', emoji: '🎂', name: 'Cake' },
+    { id: 'heart', emoji: '❤️', name: 'Heart' },
+    { id: 'trophy', emoji: '🏆', name: 'Trophy' },
+    { id: 'balloon', emoji: '🎈', name: 'Balloon' },
+  ];
+
+  // gift id: "treat:flowers" or "acc:crown"
+  function giftInfo(gift) {
+    const [kind, id] = String(gift || '').split(':');
+    if (kind === 'treat') {
+      const t = TREATS.find((x) => x.id === id);
+      return t ? { kind, id, emoji: t.emoji, name: t.name } : null;
+    }
+    if (kind === 'acc') {
+      const a = ACCESSORIES.find((x) => x.id === id);
+      return a ? { kind, id, emoji: a.emoji, name: a.name, slot: a.slot } : null;
+    }
+    return null;
+  }
+
+  const api = { ACCESSORIES, SLOTS, FESTIVALS, TREATS, activeFestival, isUnlocked, giftInfo };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.PET_ACCESSORIES = api;
 })(typeof window !== 'undefined' ? window : globalThis);
