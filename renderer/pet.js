@@ -482,6 +482,25 @@
       case 'joke': tellJoke(); break;
       case 'quote': showQuote(); break;
       case 'codetest': reviewCode(detail || ''); break;
+      // ---- visits across screens ----
+      case 'visit-offline':
+        showBubble(`😴 ${detail} is offline, so I bounced back!`, { sub: '🪑 Desk neighbor', cls: 'tip', ms: 3500 });
+        break;
+      case 'home':
+        homeFrom = detail || '';
+        setState('fly');
+        setLook('happy', 'grin');
+        play('whee');
+        break;
+      case 'poked':
+        if (state !== 'fly') setLook('happy', 'grin');
+        showBubble(`😆 ${detail} tickled me!`, { sub: '🛫 On my visit', cls: 'tip', ms: 3500 });
+        break;
+      case 'guest-arrived':
+        if (state === 'idle' || state === 'music') setLook('open', 'o');
+        showBubble(`👀 ${detail} came to visit!`, { cls: 'tip', ms: 3500 });
+        setTimeout(() => state === 'idle' && setLook('happy', 'smile'), 1500);
+        break;
       case 'vault':
         if (state === 'idle' || state === 'music') setLook('happy', 'smile');
         showBubble(pick(['🔐 Your secrets are safe with me!', '🤫 I’ll guard them. Pinky promise!', '🔒 Locked tight, only you have the key.']), { ms: 3000 });
@@ -968,7 +987,20 @@
     setTimeout(() => state === 'fly' && setLook('happy', 'grin'), 250);
   });
 
-  window.pet.onFlyDone(({ bounces = 0, crossed = false } = {}) => {
+  let homeFrom = '';
+  window.pet.onFlyDone(({ bounces = 0, crossed = false, home = false } = {}) => {
+    if (home) {
+      // back from visiting a teammate's screen
+      setState('land');
+      setLook('happy', 'grin');
+      play('chomp');
+      setTimeout(() => {
+        showBubble(homeFrom ? `🏠 I'm back! ${homeFrom} says hi 👋` : "🏠 I'm back!", { sub: '🛬 Home sweet home', cls: 'tip', ms: 4000 });
+        homeFrom = '';
+      }, 600);
+      after(4500, settle);
+      return;
+    }
     if (state !== 'fly') return;
     setState('land');
     setLook(bounces >= 3 ? 'dizzy' : 'happy', 'grin');

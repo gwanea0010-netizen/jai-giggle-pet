@@ -20,6 +20,11 @@ contextBridge.exposeInMainWorld('pet', {
   onFlyDone: on('fly-done'),
   contextMenu: () => ipcRenderer.send('context-menu'),
   stat: (key) => ipcRenderer.send('stat', key),
+  // guest window (a teammate's pet visiting this screen)
+  onGuestInit: on('guest-init'),
+  onGuestEvent: on('guest-event'),
+  guestLeave: () => ipcRenderer.send('guest:leave'),
+  guestPoke: () => ipcRenderer.send('guest:poke'),
   onWeather: on('weather'),
   weatherRefresh: () => ipcRenderer.invoke('weather:refresh'),
   weatherGet: () => ipcRenderer.invoke('weather:get'),

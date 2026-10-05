@@ -114,6 +114,12 @@ The pets use the project's **anon** key (built in via `package.json` → `teamCl
 
 No Supabase? Pick **📁 Shared folder** in the Team tab (network drive / OneDrive / Google Drive) instead.
 
+### 🪑 Visit a teammate's screen
+
+In the Team tab, pick who sits on your **left** and **right**. Then slingshot your pet hard off that side of your screen: it flies out, lands on your neighbor's screen and says hi ("👋 Hi Rahul! I'm KITTY, Jai's pet"). They can tickle it (you'll hear about it) or double-click to send it back; otherwise it flies home by itself after 30 seconds ("🏠 I'm back! Rahul says hi"). If your neighbor's pet is offline, yours just bounces off the edge.
+
+Works with the Supabase team (messages go through the `pet_send` / `pet_inbox` functions, guarded by the team code and a flood limit) or the shared-folder team.
+
 ## Badges 🏅
 
 19 badges, such as First Steps, Busy Bee (10 tasks in a day), Week Warrior (7-day streak), Night Owl, Early Bird, Juggler (3 projects in a day), Frequent Flyer (slingshot), Foodie, Query Guardian and Festive Spirit. The pet throws a party when you earn one, and teammates see your badges on the leaderboard.

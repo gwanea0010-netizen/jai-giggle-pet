@@ -79,6 +79,8 @@ const DEFAULTS = {
   cloudUrl: '',
   cloudKey: '',
   teamCode: '',
+  neighborLeft: '', // member id of the teammate sitting to your left (pet visits)
+  neighborRight: '',
   badges: [],
   memberId: '',
   hooksWanted: true,
@@ -94,7 +96,7 @@ const DEFAULTS = {
 };
 const VAULT_LOCK_OPTIONS = ['manual', 'winlock', '5', '15', '60'];
 const EDITABLE = ['ownerName', 'petName', 'species', 'scale', 'sound', 'volume', 'notifications', 'roam', 'media', 'tipsEvery', 'startWithWindows', 'teamFolder', 'updateSource', 'autoUpdate', 'codeHelper', 'vaultAutoLock', 'vaultHints',
-  'teamMode', 'cloudUrl', 'cloudKey', 'teamCode', 'weatherCity', 'dayNight'];
+  'teamMode', 'cloudUrl', 'cloudKey', 'teamCode', 'weatherCity', 'dayNight', 'neighborLeft', 'neighborRight'];
 const PUBLIC_KEYS = ['ownerName', 'petName', 'species', 'equipped', 'teamFolder', 'teamMode', 'teamCode'];
 const LONG_TEXT = { teamFolder: 500, updateSource: 500, cloudUrl: 300, cloudKey: 2000, teamCode: 120, weatherCity: 80 };
 
@@ -163,6 +165,9 @@ function sanitize(patch) {
     out.equipped = eq;
   }
   if ('vaultAutoLock' in out && !VAULT_LOCK_OPTIONS.includes(out.vaultAutoLock)) delete out.vaultAutoLock;
+  for (const k of ['neighborLeft', 'neighborRight']) {
+    if (k in patch) out[k] = /^[0-9a-f-]{36}$/i.test(String(patch[k] || '')) ? String(patch[k]) : '';
+  }
   if ('scale' in out) out.scale = Math.min(1.5, Math.max(0.45, out.scale));
   if ('volume' in out) out.volume = Math.min(1, Math.max(0, out.volume));
   if ('species' in out && !SPECIES.some((s) => s.id === out.species)) delete out.species;
@@ -431,9 +436,15 @@ async function publishTeam() {
 async function readBoard() {
   const be = teamBackend();
   if (!be) return [];
-  if (be.kind === 'cloud') return teamcloud.read(be.cfg);
-  return team.read(be.folder);
+  const board = be.kind === 'cloud' ? await teamcloud.read(be.cfg) : team.read(be.folder);
+  boardCache = board; // also tells visits who's online
+  return board;
 }
+
+// Keep "who's online" fresh while desk neighbors are set (visits only go to online pets).
+setInterval(() => {
+  if (teamBackend() && (settings.neighborLeft || settings.neighborRight)) readBoard().catch(() => {});
+}, 60 * 1000);
 
 let lastRank = null;
 // Fun nudges: tell the owner when they take #1 today, or when someone passes them.
@@ -531,7 +542,7 @@ function applyScale() {
 // Keep the whole pet inside the work area of the monitor it's on (it may peek a little past
 // the sides), so a resolution / scaling / monitor change can't leave it under the taskbar.
 function ensureOnScreen() {
-  if (!win || win.isDestroyed() || dragTimer || flyTimer || walkTimer) return;
+  if (!win || win.isDestroyed() || dragTimer || flyTimer || walkTimer || away) return;
   const b = win.getBounds();
   const wa = screen.getDisplayMatching(b).workArea;
   const { w, h } = petSize(settings.scale);
@@ -842,33 +853,55 @@ function areaAt(areas, x, y) {
     || col[col.length - 1];
 }
 
-ipcMain.on('fling', (_e, { vx, vy }) => {
-  if (!win) return;
-  stopWalk();
-  clearInterval(flyTimer);
-  win.setIgnoreMouseEvents(true, { forward: true });
-
+// Flies a pet window with gravity across all monitors, bouncing off the outer edges.
+// opts.exit(side, speed) -> true lets it leave through that edge instead of bouncing
+// (used to visit a teammate's screen); opts.onExit(side, motion) is called once it's gone.
+function flyWindow(target, vx, vy, opts = {}) {
   const areas = screen.getAllDisplays().map((d) => d.workArea);
-  const [w, h] = win.getSize();
-  const minX = Math.min(...areas.map((a) => a.x)) - w * 0.2;
-  const maxX = Math.max(...areas.map((a) => a.x + a.width)) - w * 0.8;
+  const [w, h] = target.getSize();
+  const left = Math.min(...areas.map((a) => a.x));
+  const right = Math.max(...areas.map((a) => a.x + a.width));
+  const minX = left - w * 0.2;
+  const maxX = right - w * 0.8;
   const minY = Math.min(...areas.map((a) => a.y)) - h * 0.35;
   const G = 1.1;
-  let [x, y] = win.getPosition();
+  let [x, y] = target.getPosition();
   vx = Math.max(-80, Math.min(80, Number(vx) || 0));
   vy = Math.max(-80, Math.min(80, Number(vy) || 0));
   const startArea = areaAt(areas, x + w / 2, y + h / 2);
   let bounces = 0;
   let frames = 0;
+  let exiting = null; // 'left' | 'right' once it's flying off-screen
 
-  flyTimer = setInterval(() => {
+  const timer = setInterval(() => {
+    if (target.isDestroyed()) return clearInterval(timer);
     frames++;
     vy += G;
     x += vx;
     y += vy;
 
-    if (x < minX) { x = minX; vx = -vx * 0.6; bounces++; broadcast('fly-bounce'); }
-    if (x > maxX) { x = maxX; vx = -vx * 0.6; bounces++; broadcast('fly-bounce'); }
+    if (exiting) {
+      // keep flying until it's completely off the outer edge
+      target.setPosition(Math.round(x), Math.round(Math.min(y, minY + 4000)));
+      if ((exiting === 'left' && x < left - w) || (exiting === 'right' && x > right) || frames > 900) {
+        clearInterval(timer);
+        const area = areaAt(areas, Math.min(Math.max(x, left), right - 1), y + h / 2);
+        if (opts.onExit) opts.onExit(exiting, { vx, vy, yFrac: Math.min(0.9, Math.max(0, (y - area.y) / area.height)) });
+      }
+      return;
+    }
+
+    for (const [side, hit] of [['left', x < minX], ['right', x > maxX]]) {
+      if (!hit) continue;
+      if (opts.exit && opts.exit(side, Math.abs(vx))) {
+        exiting = side;
+        return;
+      }
+      x = side === 'left' ? minX : maxX;
+      vx = -vx * 0.6;
+      bounces++;
+      if (opts.onBounce) opts.onBounce();
+    }
     if (y < minY) { y = minY; vy = Math.abs(vy) * 0.4; }
 
     const area = areaAt(areas, x + w / 2, y + h * 0.5);
@@ -879,7 +912,7 @@ ipcMain.on('fling', (_e, { vx, vy }) => {
       if (vy > 7) {
         vy = -vy * 0.5;
         bounces++;
-        broadcast('fly-bounce');
+        if (opts.onBounce) opts.onBounce();
       } else {
         vy = 0;
         grounded = true;
@@ -887,34 +920,236 @@ ipcMain.on('fling', (_e, { vx, vy }) => {
       vx *= 0.82; // ground friction
     }
 
-    win.setPosition(Math.round(x), Math.round(y));
+    target.setPosition(Math.round(x), Math.round(y));
 
     if ((grounded && Math.abs(vx) < 0.6) || frames > 900) {
-      clearInterval(flyTimer);
-      flyTimer = null;
-      // Settle exactly on the landing monitor's floor, fully on screen
-      // (monitors with different scaling can leave the pet floating otherwise).
-      // Crossing monitors with different scaling also distorts the window size, so restore it too.
-      const b = win.getBounds();
+      clearInterval(timer);
+      // Settle exactly on the landing monitor's floor, fully on screen. Crossing monitors with
+      // different scaling also distorts the window size, so restore it too.
+      const b = target.getBounds();
       const wa = screen.getDisplayMatching(b).workArea;
       const size = petSize(settings.scale);
-      const target = {
+      const box = {
         x: Math.round(Math.min(Math.max(b.x, wa.x), wa.x + wa.width - size.w)),
         y: Math.round(wa.y + wa.height - size.h),
         width: size.w,
         height: size.h,
       };
-      win.setBounds(target);
-      win.setBounds(target); // second pass: Windows applies the new monitor's DPI after the first move
-      savePosition();
-      broadcast('fly-done', { bounces, crossed: area !== startArea && areas.length > 1 });
+      target.setBounds(box);
+      target.setBounds(box); // second pass: Windows applies the new monitor's DPI after the first move
+      if (opts.onDone) opts.onDone({ bounces, crossed: area !== startArea && areas.length > 1 });
     }
   }, 16);
+  return timer;
+}
+
+ipcMain.on('fling', (_e, { vx, vy }) => {
+  if (!win || away) return;
+  stopWalk();
+  clearInterval(flyTimer);
+  win.setIgnoreMouseEvents(true, { forward: true });
+  flyTimer = flyWindow(win, vx, vy, {
+    onBounce: () => broadcast('fly-bounce'),
+    exit: canVisit,
+    onExit: (side, motion) => {
+      flyTimer = null;
+      startVisit(side, motion);
+    },
+    onDone: (info) => {
+      flyTimer = null;
+      savePosition();
+      broadcast('fly-done', info);
+    },
+  });
 });
 
+// ---------- visits: fling your pet onto a teammate's screen ----------
+let away = null; // { to, toName, side, timer } while our pet is visiting someone
+const guests = new Map(); // webContents id -> { win, from, enteredFrom, payload }
+let boardCache = [];
+let lastOfflineNote = 0;
+const VISIT_SPEED = 18; // px/frame needed to leave through the edge
+
+const neighborFor = (side) => (side === 'left' ? settings.neighborLeft : settings.neighborRight);
+const memberName = (id) => (boardCache.find((m) => m.id === id) || {}).ownerName || 'your teammate';
+const isOnline = (id) => boardCache.some((m) => m.id === id && Date.now() - m.updatedAt < 5 * 60 * 1000);
+
+function sendTeamMessage(to, kind, payload) {
+  const be = teamBackend();
+  if (!be) return Promise.reject(new Error('no team'));
+  if (be.kind === 'cloud') return teamcloud.send(be.cfg, settings.memberId, to, kind, payload);
+  team.send(be.folder, settings.memberId, to, kind, payload);
+  return Promise.resolve();
+}
+
+// Called by the flight when the pet hits the left/right outer edge.
+function canVisit(side, speed) {
+  const to = neighborFor(side);
+  if (!to || away || speed < VISIT_SPEED || !teamBackend()) return false;
+  if (!isOnline(to)) {
+    if (Date.now() - lastOfflineNote > 15000) {
+      lastOfflineNote = Date.now();
+      broadcast('pet-event', { state: 'visit-offline', detail: memberName(to) });
+    }
+    return false;
+  }
+  return true;
+}
+
+function startVisit(side, motion) {
+  const to = neighborFor(side);
+  away = { to, toName: memberName(to), side };
+  win.hide();
+  sendTeamMessage(to, 'visit', {
+    side,
+    vx: motion.vx,
+    vy: motion.vy,
+    yFrac: motion.yFrac,
+    petName: settings.petName,
+    ownerName: settings.ownerName || 'A teammate',
+    species: settings.species,
+    equipped: settings.equipped,
+  }).catch(() => returnHome(null)); // couldn't send: come straight back
+  // Safety net: come home even if the other pet never answers.
+  away.timer = setTimeout(() => returnHome(null), 60 * 1000);
+}
+
+// Our pet flies back in through the edge it left from.
+function returnHome(byName) {
+  if (!away || !win || win.isDestroyed()) return;
+  clearTimeout(away.timer);
+  const { side } = away;
+  away = null;
+  const areas = screen.getAllDisplays().map((d) => d.workArea);
+  const edge = side === 'left'
+    ? areas.reduce((a, b) => (b.x < a.x ? b : a))
+    : areas.reduce((a, b) => (b.x + b.width > a.x + a.width ? b : a));
+  const { w, h } = petSize(settings.scale);
+  const x = side === 'left' ? edge.x - w : edge.x + edge.width;
+  const y = Math.round(edge.y + edge.height * 0.25);
+  win.setBounds({ x, y, width: w, height: h });
+  win.showInactive();
+  broadcast('pet-event', { state: 'home', detail: byName || '' });
+  clearInterval(flyTimer);
+  flyTimer = flyWindow(win, side === 'left' ? 30 : -30, -12, {
+    onBounce: () => broadcast('fly-bounce'),
+    onDone: (info) => {
+      flyTimer = null;
+      savePosition();
+      broadcast('fly-done', { ...info, home: true });
+    },
+  });
+}
+
+// A teammate's pet arrives on our screen as a guest window.
+function spawnGuest(from, p) {
+  if (guests.size >= 3) {
+    sendTeamMessage(from, 'return', { byName: settings.ownerName || 'A teammate' }).catch(() => {});
+    return;
+  }
+  const enteredFrom = p.side === 'right' ? 'left' : 'right'; // they threw it right -> it comes in on our left
+  const areas = screen.getAllDisplays().map((d) => d.workArea);
+  const edge = enteredFrom === 'left'
+    ? areas.reduce((a, b) => (b.x < a.x ? b : a))
+    : areas.reduce((a, b) => (b.x + b.width > a.x + a.width ? b : a));
+  const { w, h } = petSize(settings.scale);
+  const gw = new BrowserWindow({
+    width: w,
+    height: h,
+    x: enteredFrom === 'left' ? edge.x - w : edge.x + edge.width,
+    y: Math.round(edge.y + edge.height * Math.min(0.6, Math.max(0.05, Number(p.yFrac) || 0.3))),
+    transparent: true,
+    frame: false,
+    resizable: false,
+    skipTaskbar: true,
+    alwaysOnTop: true,
+    hasShadow: false,
+    focusable: false,
+    show: false,
+    webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false, backgroundThrottling: false },
+  });
+  gw.setAlwaysOnTop(true, 'screen-saver');
+  gw.setIgnoreMouseEvents(true, { forward: true });
+  const id = gw.webContents.id;
+  guests.set(id, { win: gw, from, enteredFrom, payload: p });
+  gw.on('closed', () => guests.delete(id));
+  gw.loadFile(path.join(__dirname, 'renderer', 'guest.html'));
+  gw.webContents.once('did-finish-load', () => {
+    gw.webContents.send('guest-init', {
+      petName: String(p.petName || 'Pet').slice(0, 40),
+      ownerName: String(p.ownerName || 'A teammate').slice(0, 40),
+      species: String(p.species || 'cat'),
+      equipped: p.equipped && typeof p.equipped === 'object' ? p.equipped : {},
+      hostName: settings.ownerName || 'friend',
+      scale: settings.scale,
+      sound: settings.sound,
+      volume: settings.volume,
+    });
+    gw.showInactive();
+    const speed = Math.min(60, Math.max(22, Math.abs(Number(p.vx) || 30)));
+    flyWindow(gw, enteredFrom === 'left' ? speed : -speed, Math.max(-25, Math.min(5, Number(p.vy) || -8)), {
+      onBounce: () => !gw.isDestroyed() && gw.webContents.send('guest-event', 'bounce'),
+      onDone: () => !gw.isDestroyed() && gw.webContents.send('guest-event', 'landed'),
+    });
+  });
+  broadcast('pet-event', { state: 'guest-arrived', detail: `${p.ownerName || 'A teammate'}'s ${p.petName || 'pet'}` });
+}
+
+// The guest flies back out the way it came, then tells its owner to bring it home.
+function sendGuestHome(g) {
+  if (!g || g.leaving || g.win.isDestroyed()) return;
+  g.leaving = true;
+  g.win.webContents.send('guest-event', 'leaving');
+  flyWindow(g.win, g.enteredFrom === 'left' ? -40 : 40, -16, {
+    exit: (side) => side === g.enteredFrom,
+    onExit: () => {
+      if (!g.win.isDestroyed()) g.win.close();
+      sendTeamMessage(g.from, 'return', { byName: settings.ownerName || 'A teammate' }).catch(() => {});
+    },
+    onDone: () => {
+      // landed instead of leaving (shouldn't happen): just close it
+      if (!g.win.isDestroyed()) g.win.close();
+      sendTeamMessage(g.from, 'return', { byName: settings.ownerName || 'A teammate' }).catch(() => {});
+    },
+  });
+}
+
+const guestOf = (e) => guests.get(e.sender.id);
+ipcMain.on('guest:leave', (e) => sendGuestHome(guestOf(e)));
+ipcMain.on('guest:poke', (e) => {
+  const g = guestOf(e);
+  if (g && !g.poked) {
+    g.poked = true; // one "tickled" message per visit
+    sendTeamMessage(g.from, 'poke', { byName: settings.ownerName || 'A teammate' }).catch(() => {});
+  }
+});
+
+// Check our inbox every few seconds while we're on a team.
+let inboxBusy = false;
+setInterval(async () => {
+  const be = teamBackend();
+  if (!be || inboxBusy) return;
+  inboxBusy = true;
+  try {
+    const msgs = be.kind === 'cloud' ? await teamcloud.inbox(be.cfg, settings.memberId) : team.inbox(be.folder, settings.memberId);
+    for (const m of msgs) {
+      const p = m.payload || {};
+      if (m.kind === 'visit') spawnGuest(m.from, p);
+      else if (m.kind === 'return' && away && m.from === away.to) returnHome(String(p.byName || '').slice(0, 40));
+      else if (m.kind === 'poke') broadcast('pet-event', { state: 'poked', detail: String(p.byName || 'Someone').slice(0, 40) });
+    }
+  } catch {
+    // offline or not set up yet; try again next tick
+  } finally {
+    inboxBusy = false;
+  }
+}, 3000);
+
 // ---------- IPC ----------
-ipcMain.on('set-ignore-mouse', (_e, ignore) => {
-  if (win) win.setIgnoreMouseEvents(ignore, { forward: true });
+// Works for the pet and for guest windows (each sets its own click-through).
+ipcMain.on('set-ignore-mouse', (e, ignore) => {
+  const w = BrowserWindow.fromWebContents(e.sender);
+  if (w && !w.isDestroyed()) w.setIgnoreMouseEvents(ignore, { forward: true });
 });
 
 ipcMain.on('move-by', (_e, { dx, dy }) => {

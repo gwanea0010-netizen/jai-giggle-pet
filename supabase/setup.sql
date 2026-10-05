@@ -109,12 +109,80 @@ begin
 end;
 $$;
 
--- Only the two API functions are callable by the app.
+-- ---------- visits: fling your pet onto a teammate's screen ----------
+create table if not exists public.pet_visits (
+  id          bigint generated always as identity primary key,
+  team_id     uuid not null references public.pet_teams(id) on delete cascade,
+  from_member uuid not null,
+  to_member   uuid not null,
+  kind        text not null,                  -- 'visit' | 'return' | 'poke'
+  payload     jsonb not null default '{}'::jsonb,
+  created_at  timestamptz not null default now()
+);
+create index if not exists pet_visits_inbox on public.pet_visits (team_id, to_member);
+alter table public.pet_visits enable row level security;
+revoke all on public.pet_visits from anon, authenticated;
+
+-- Send a message to a teammate's pet.
+create or replace function public.pet_send(p_code text, p_from uuid, p_to uuid, p_kind text, p_payload jsonb)
+returns void
+language plpgsql security definer
+set search_path = public
+as $$
+declare
+  t uuid := public.pet_team_id(p_code);
+begin
+  if t is null then
+    raise exception 'invalid team code' using errcode = '28000';
+  end if;
+  if p_kind not in ('visit', 'return', 'poke') then
+    raise exception 'unknown message kind';
+  end if;
+  if octet_length(coalesce(p_payload, '{}'::jsonb)::text) > 4000 then
+    raise exception 'message too big';
+  end if;
+  if not exists (select 1 from public.pet_members where team_id = t and member_id = p_to) then
+    raise exception 'unknown teammate';
+  end if;
+  if (select count(*) from public.pet_visits
+      where team_id = t and from_member = p_from and created_at > now() - interval '1 minute') >= 20 then
+    raise exception 'slow down';
+  end if;
+  insert into public.pet_visits (team_id, from_member, to_member, kind, payload)
+  values (t, p_from, p_to, p_kind, coalesce(p_payload, '{}'::jsonb));
+end;
+$$;
+
+-- Fetch (and remove) everything waiting for this pet.
+create or replace function public.pet_inbox(p_code text, p_member uuid)
+returns table (id bigint, from_member uuid, kind text, payload jsonb, created_at timestamptz)
+language plpgsql security definer
+set search_path = public
+as $$
+declare
+  t uuid := public.pet_team_id(p_code);
+begin
+  if t is null then
+    raise exception 'invalid team code' using errcode = '28000';
+  end if;
+  delete from public.pet_visits v where v.team_id = t and v.created_at < now() - interval '10 minutes';
+  return query
+    delete from public.pet_visits v
+    where v.team_id = t and v.to_member = p_member
+    returning v.id, v.from_member, v.kind, v.payload, v.created_at;
+end;
+$$;
+
+-- Only the API functions are callable by the app.
 revoke execute on function public.pet_team_id(text) from public, anon, authenticated;
 revoke execute on function public.pet_publish(text, jsonb) from public;
 revoke execute on function public.pet_board(text) from public;
+revoke execute on function public.pet_send(text, uuid, uuid, text, jsonb) from public;
+revoke execute on function public.pet_inbox(text, uuid) from public;
 grant execute on function public.pet_publish(text, jsonb) to anon, authenticated;
 grant execute on function public.pet_board(text) to anon, authenticated;
+grant execute on function public.pet_send(text, uuid, uuid, text, jsonb) to anon, authenticated;
+grant execute on function public.pet_inbox(text, uuid) to anon, authenticated;
 
 -- ---------- create your team ----------
 -- Pick a team code (long and hard to guess, e.g. cyborg-erp-7Hq2-pets-9xLm) and run:

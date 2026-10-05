@@ -181,6 +181,16 @@
     $('team-folder').className = `status ${t.error ? 'bad' : 'muted'}`;
     $('team-open').hidden = t.mode !== 'folder';
     const members = [...t.members];
+    // desk neighbor pickers
+    const others = t.members.filter((m) => m.id !== t.me);
+    for (const [sel, key] of [['nb-left', 'neighborLeft'], ['nb-right', 'neighborRight']]) {
+      if (document.activeElement === $(sel)) continue;
+      const current = S[key] || '';
+      $(sel).innerHTML = '<option value="">— nobody —</option>' + others
+        .map((m) => `<option value="${esc(m.id)}"${m.id === current ? ' selected' : ''}>${esc(m.ownerName)} (${esc(m.petName)})</option>`)
+        .join('');
+      if (current && !others.some((m) => m.id === current)) $(sel).insertAdjacentHTML('beforeend', `<option value="${esc(current)}" selected>(not active lately)</option>`);
+    }
     if (boardMode === 'total') members.sort((a, b) => b.total - a.total);
     const list = $('board');
     list.innerHTML = '';
@@ -205,6 +215,8 @@
   }
 
   $('team-pick').addEventListener('click', async () => { await api.teamPick(); refreshTeam(); });
+  $('nb-left').addEventListener('change', () => save({ neighborLeft: $('nb-left').value }));
+  $('nb-right').addEventListener('change', () => save({ neighborRight: $('nb-right').value }));
   $('team-change').addEventListener('click', async () => {
     await api.teamLeave(); // back to the setup card to pick Supabase or another folder
     refreshTeam();
