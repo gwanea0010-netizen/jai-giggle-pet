@@ -120,7 +120,7 @@ Right-click the pet → **Message a teammate** (or the 💬 next to a name on th
 
 - Messages are encrypted with a key derived from the team code (AES-256-GCM), so they're unreadable in the Supabase table / shared folder
 - Offline teammates get them when their pet starts (messages wait up to 24 hours)
-- The conversation history is stored only on your PC (`%APPDATA%\Giggles Pet\messages.json`)
+- **Chats disappear after 24 hours**, both on the server and in the local history (`%APPDATA%\Giggles Pet\messages.json`, this PC only)
 
 ### 🪑 Visit a teammate's screen
 

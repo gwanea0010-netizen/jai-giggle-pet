@@ -88,7 +88,7 @@
   document.querySelectorAll('[data-q]').forEach((b) => b.addEventListener('click', () => send(b.dataset.q)));
 
   C.onUpdate((withId) => {
-    if (withId === current) loadThread();
+    if (withId === current || withId === '') loadThread(); // '' = old messages were cleaned up
     loadPeople();
   });
   C.onSelect((id) => select(id));

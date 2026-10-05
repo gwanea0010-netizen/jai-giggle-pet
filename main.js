@@ -1206,6 +1206,11 @@ ipcMain.handle('chat:send', async (_e, { to, text } = {}) => {
 });
 ipcMain.on('chat:open', (_e, withId) => openChat(withId));
 
+// Chats vanish after 24 hours: clean the local history every hour (and refresh an open chat window).
+setInterval(() => {
+  if (getChat().prune()) chatChanged('');
+}, 60 * 60 * 1000);
+
 // Check our inbox every few seconds while we're on a team.
 let inboxBusy = false;
 setInterval(async () => {
