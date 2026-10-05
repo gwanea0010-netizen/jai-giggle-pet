@@ -91,6 +91,10 @@ html, body {
 }
 #bubble button:hover { background: #22a83a; border-color: #22a83a; }
 #bubble .vbig { display: block; width: 100%; margin-top: 8px; padding: 6px; font-size: 12px; }
+#bubble.chat-bubble { background: #fff7e6; }
+#bubble.chat-bubble::after { background: #fff7e6; }
+.chat-text { font-size: 13.5px; font-weight: 700; white-space: pre-wrap; word-break: break-word; max-height: 120px; overflow: hidden; }
+.chat-acts { margin-top: 6px; justify-content: flex-end; }
 #bubble.code { max-width: 262px; text-align: left; font-size: 12px; }
 #bubble.code #bubble-text { white-space: pre-line; }
 

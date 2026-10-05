@@ -114,6 +114,14 @@ The pets use the project's **anon** key (built in via `package.json` → `teamCl
 
 No Supabase? Pick **📁 Shared folder** in the Team tab (network drive / OneDrive / Google Drive) instead.
 
+### 💬 Team chat
+
+Right-click the pet → **Message a teammate** (or the 💬 next to a name on the leaderboard). Your teammate's pet hops and shows the message in a bubble with **↩ Reply** and **👍** buttons. Quick replies: ☕ Chai? · 🍽️ Lunch? · 🔍 Review please · 📞 Call me · 🎉 Great job!
+
+- Messages are encrypted with a key derived from the team code (AES-256-GCM), so they're unreadable in the Supabase table / shared folder
+- Offline teammates get them when their pet starts (messages wait up to 24 hours)
+- The conversation history is stored only on your PC (`%APPDATA%\Giggles Pet\messages.json`)
+
 ### 🪑 Visit a teammate's screen
 
 In the Team tab, pick who sits on your **left** and **right**. Then slingshot your pet hard off that side of your screen: it flies out, lands on your neighbor's screen and says hi ("👋 Hi Rahul! I'm KITTY, Jai's pet"). They can tickle it (you'll hear about it) or double-click to send it back; otherwise it flies home by itself after 30 seconds ("🏠 I'm back! Rahul says hi"). If your neighbor's pet is offline, yours just bounces off the edge.

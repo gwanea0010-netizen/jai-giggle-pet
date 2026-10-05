@@ -453,7 +453,9 @@
   });
 
   // ---------- events from Claude Code / menus ----------
-  window.pet.onEvent(({ state: ev, project, session = 'default', detail, count, sub }) => {
+  let payloadFrom = '';
+  window.pet.onEvent(({ state: ev, project, session = 'default', detail, count, sub, from }) => {
+    payloadFrom = from || '';
     lastActivity = Date.now();
     if (project) lastProject = project;
 
@@ -482,6 +484,25 @@
       case 'joke': tellJoke(); break;
       case 'quote': showQuote(); break;
       case 'codetest': reviewCode(detail || ''); break;
+      // ---- chat ----
+      case 'chat': {
+        if (['fly', 'aim'].includes(state)) break;
+        if (state === 'idle' || state === 'music' || state === 'sleep') {
+          if (state === 'sleep') goIdle(true);
+          setState('hello'); // a little hop to get attention
+          after(1300, settle);
+        }
+        setLook('open', 'o');
+        setTimeout(() => setLook('happy', 'grin'), 700);
+        const fromId = esc(payloadFrom || '');
+        showBubble(
+          `<div class="chat-text">${esc(detail)}</div>
+           <div class="vline chat-acts"><button data-chat-reply="${fromId}">↩ Reply</button><button data-chat-like="${fromId}">👍</button></div>`,
+          { sub: `💬 ${sub}`, cls: 'vault-bubble chat-bubble', html: true, ms: 30000 }
+        );
+        play('ping');
+        break;
+      }
       // ---- visits across screens ----
       case 'visit-offline':
         showBubble(`😴 ${detail} is offline, so I bounced back!`, { sub: '🪑 Desk neighbor', cls: 'tip', ms: 3500 });
@@ -639,6 +660,18 @@
     if (e.target.closest('[data-vunlock]')) {
       hideBubble();
       window.pet.openVault();
+    }
+    const reply = e.target.closest('[data-chat-reply]');
+    if (reply) {
+      hideBubble();
+      window.pet.chat.open(reply.dataset.chatReply);
+      return;
+    }
+    const like = e.target.closest('[data-chat-like]');
+    if (like) {
+      const r = await window.pet.chat.send(like.dataset.chatLike, '👍');
+      like.textContent = r.ok ? '✓ Sent' : '⚠️';
+      setTimeout(hideBubble, 900);
     }
   });
 

@@ -210,6 +210,14 @@
           <span class="tags" title="${esc((m.badges || []).map((id) => (BADGE[id] || {}).name).filter(Boolean).join(', '))}">${(m.badges || []).slice(-8).map((id) => (BADGE[id] || {}).emoji || '').join('')}</span></span>
         <span class="score"><b>${score}</b><small>${boardMode === 'today' ? 'today' : 'all time'}</small></span>`;
       dress(li.querySelector('.pet'), m);
+      if (m.id !== t.me) {
+        const btn = document.createElement('button');
+        btn.className = 'chat-btn';
+        btn.title = `Message ${m.ownerName}`;
+        btn.textContent = '💬';
+        btn.addEventListener('click', () => api.chat.open(m.id));
+        li.querySelector('.who b').appendChild(btn);
+      }
       list.appendChild(li);
     });
   }

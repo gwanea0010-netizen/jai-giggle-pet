@@ -19,6 +19,7 @@ const team = require('./lib/team.js');
 const teamcloud = require('./lib/teamcloud.js');
 const ACH = require('./renderer/achievements.js');
 const weather = require('./lib/weather.js');
+const chat = require('./lib/chat.js');
 
 // The installed app ships a small native hook (no Node.js needed on the machine).
 const HOOK_COMMAND = app.isPackaged
@@ -1124,6 +1125,87 @@ ipcMain.on('guest:poke', (e) => {
   }
 });
 
+// ---------- chat with teammates ----------
+let chatStore = null;
+let chatWin = null;
+const getChat = () => chatStore || (chatStore = new chat.ChatStore(path.join(app.getPath('userData'), 'messages.json')));
+// The key for sealing messages: the team code (Supabase) or the shared folder path.
+const chatSecret = () => (settings.teamMode === 'cloud' ? settings.teamCode : `folder:${settings.teamFolder}`);
+
+function chatChanged(withId) {
+  if (chatWin && !chatWin.isDestroyed()) chatWin.webContents.send('chat-update', withId);
+}
+
+async function sendChat(to, text) {
+  const body = chat.cleanText(text);
+  if (!body) throw new Error('Type a message first');
+  if (!teamBackend()) throw new Error('Join a team first (Team tab)');
+  await sendTeamMessage(to, 'msg', { fromName: settings.ownerName || 'A teammate', ...chat.seal(chatSecret(), { text: body, at: Date.now() }) });
+  getChat().add({ with: to, withName: memberName(to), dir: 'out', text: body });
+  chatChanged(to);
+}
+
+function receiveChat(from, p) {
+  let body;
+  try {
+    body = chat.open(chatSecret(), p);
+  } catch {
+    return; // sealed with a different team code
+  }
+  const fromName = String(p.fromName || memberName(from)).slice(0, 40);
+  const item = getChat().add({ with: from, withName: fromName, dir: 'in', text: body.text, at: Date.now() });
+  chatChanged(from);
+  broadcast('pet-event', { state: 'chat', detail: item.text, sub: fromName, from });
+  notify(`💬 ${fromName}`, item.text);
+}
+
+function openChat(withId) {
+  const target = typeof withId === 'string' ? withId : '';
+  if (chatWin && !chatWin.isDestroyed()) {
+    if (target) chatWin.webContents.send('chat-select', target);
+    chatWin.show();
+    chatWin.focus();
+    return;
+  }
+  chatWin = new BrowserWindow({
+    width: 760,
+    height: 560,
+    minWidth: 520,
+    minHeight: 420,
+    title: 'Team chat',
+    icon: ICON,
+    autoHideMenuBar: true,
+    backgroundColor: '#0f1424',
+    webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false },
+  });
+  chatWin.loadFile(path.join(__dirname, 'renderer', 'chat.html'), { hash: target });
+  chatWin.on('closed', () => (chatWin = null));
+}
+
+ipcMain.handle('chat:state', async () => {
+  if (teamBackend()) await readBoard().catch(() => {});
+  const unread = getChat().unread();
+  const lastAt = getChat().lastAt();
+  const members = boardCache
+    .filter((m) => m.id !== settings.memberId)
+    .map((m) => ({ id: m.id, ownerName: m.ownerName, petName: m.petName, species: m.species, equipped: m.equipped, online: isOnline(m.id), unread: unread[m.id] || 0, lastAt: lastAt[m.id] || 0 }))
+    .sort((a, b) => b.lastAt - a.lastAt || Number(b.online) - Number(a.online) || a.ownerName.localeCompare(b.ownerName));
+  return { team: !!teamBackend(), me: settings.memberId, myName: settings.ownerName, members };
+});
+ipcMain.handle('chat:thread', (_e, withId) => {
+  getChat().markRead(String(withId));
+  return getChat().thread(String(withId));
+});
+ipcMain.handle('chat:send', async (_e, { to, text } = {}) => {
+  try {
+    await sendChat(String(to), text);
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+});
+ipcMain.on('chat:open', (_e, withId) => openChat(withId));
+
 // Check our inbox every few seconds while we're on a team.
 let inboxBusy = false;
 setInterval(async () => {
@@ -1137,6 +1219,7 @@ setInterval(async () => {
       if (m.kind === 'visit') spawnGuest(m.from, p);
       else if (m.kind === 'return' && away && m.from === away.to) returnHome(String(p.byName || '').slice(0, 40));
       else if (m.kind === 'poke') broadcast('pet-event', { state: 'poked', detail: String(p.byName || 'Someone').slice(0, 40) });
+      else if (m.kind === 'msg') receiveChat(m.from, p);
     }
   } catch {
     // offline or not set up yet; try again next tick
@@ -1341,6 +1424,7 @@ ipcMain.on('context-menu', () => {
     { label: 'Wardrobe 👕', click: () => openSettings('wardrobe') },
     { label: 'Team leaderboard 🏆', click: () => openSettings('team') },
     { label: 'Password vault 🔐', click: openVault },
+    { label: 'Message a teammate 💬', click: () => openChat() },
     {
       label: 'Size',
       submenu: SIZES.map((s) => ({

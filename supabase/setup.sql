@@ -115,7 +115,7 @@ create table if not exists public.pet_visits (
   team_id     uuid not null references public.pet_teams(id) on delete cascade,
   from_member uuid not null,
   to_member   uuid not null,
-  kind        text not null,                  -- 'visit' | 'return' | 'poke'
+  kind        text not null,                  -- 'visit' | 'return' | 'poke' | 'msg'
   payload     jsonb not null default '{}'::jsonb,
   created_at  timestamptz not null default now()
 );
@@ -135,7 +135,7 @@ begin
   if t is null then
     raise exception 'invalid team code' using errcode = '28000';
   end if;
-  if p_kind not in ('visit', 'return', 'poke') then
+  if p_kind not in ('visit', 'return', 'poke', 'msg') then
     raise exception 'unknown message kind';
   end if;
   if octet_length(coalesce(p_payload, '{}'::jsonb)::text) > 4000 then
@@ -165,7 +165,11 @@ begin
   if t is null then
     raise exception 'invalid team code' using errcode = '28000';
   end if;
-  delete from public.pet_visits v where v.team_id = t and v.created_at < now() - interval '10 minutes';
+  -- visits expire quickly; chat messages wait up to a day for an offline teammate
+  delete from public.pet_visits v
+  where v.team_id = t
+    and ((v.kind <> 'msg' and v.created_at < now() - interval '10 minutes')
+      or (v.kind = 'msg' and v.created_at < now() - interval '24 hours'));
   return query
     delete from public.pet_visits v
     where v.team_id = t and v.to_member = p_member

@@ -1,0 +1,42 @@
+html, body { height: 100%; }
+body { overflow: hidden; }
+.chat-app { display: grid; grid-template-columns: 240px 1fr; height: 100vh; }
+.pad { padding: 0 14px; }
+.muted { color: var(--muted); }
+
+.people { border-right: 1px solid var(--line); background: var(--card); display: flex; flex-direction: column; min-height: 0; }
+.people-head { padding: 16px 14px; font-weight: 800; font-size: 15px; color: #fff; background: linear-gradient(120deg, var(--navy), var(--blue) 60%, var(--green)); }
+#people { list-style: none; margin: 0; padding: 6px; overflow-y: auto; flex: 1; }
+#people li {
+  display: grid; grid-template-columns: 44px 1fr auto; align-items: center; gap: 8px;
+  padding: 6px 8px; border-radius: 10px; cursor: pointer;
+}
+#people li:hover { background: var(--field); }
+#people li.active { background: rgba(30, 136, 229, .15); }
+.avatar { position: relative; width: 44px; height: 44px; }
+.avatar .pet { width: 44px; height: 44px; }
+.dot { position: absolute; right: 2px; bottom: 2px; width: 10px; height: 10px; border-radius: 50%; background: #8a93a8; border: 2px solid var(--card); }
+.dot.on { background: #22c55e; }
+.pname b { display: block; font-size: 13.5px; }
+.pname small { color: var(--muted); font-size: 11.5px; }
+.unread { background: #e5484d; color: #fff; border-radius: 99px; font-size: 11px; font-weight: 800; padding: 1px 7px; }
+
+.thread { display: flex; flex-direction: column; min-height: 0; }
+.thread-head { padding: 14px 16px; border-bottom: 1px solid var(--line); font-weight: 700; display: flex; align-items: center; gap: 8px; }
+.thread-head small { color: var(--muted); font-weight: 500; }
+.messages { flex: 1; overflow-y: auto; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; }
+.msg { max-width: 72%; padding: 8px 12px; border-radius: 14px; line-height: 1.4; white-space: pre-wrap; word-break: break-word; }
+.msg.in { align-self: flex-start; background: var(--card); border: 1px solid var(--line); border-bottom-left-radius: 4px; }
+.msg.out { align-self: flex-end; background: linear-gradient(120deg, var(--navy), var(--blue)); color: #fff; border-bottom-right-radius: 4px; }
+.msg time { display: block; font-size: 10.5px; opacity: .6; margin-top: 2px; }
+.day { align-self: center; font-size: 11px; color: var(--muted); margin: 8px 0 2px; }
+.empty-thread { margin: auto; color: var(--muted); text-align: center; }
+
+.quick { display: flex; gap: 6px; flex-wrap: wrap; padding: 8px 16px 0; }
+.quick button { padding: 5px 10px; font-size: 12.5px; border-radius: 99px; }
+.composer { display: flex; gap: 8px; padding: 10px 16px 6px; }
+.composer textarea {
+  flex: 1; resize: none; font: inherit; color: var(--text); background: var(--field);
+  border: 1.5px solid var(--line); border-radius: 12px; padding: 9px 12px; outline: none;
+}
+.composer textarea:focus { border-color: var(--blue); }

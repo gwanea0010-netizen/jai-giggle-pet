@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'" />
+  <title>Team chat</title>
+  <link rel="stylesheet" href="pet.css" />
+  <link rel="stylesheet" href="settings.css" />
+  <link rel="stylesheet" href="chat.css" />
+</head>
+<body>
+  <div class="chat-app">
+    <aside class="people">
+      <div class="people-head">💬 Team chat</div>
+      <ul id="people"></ul>
+      <p class="hint pad" id="people-empty" hidden>No teammates yet. Join a team in Settings → 🏆 Team.</p>
+    </aside>
+    <section class="thread">
+      <header class="thread-head" id="thread-head"><span class="muted">Pick a teammate</span></header>
+      <div class="messages" id="messages"></div>
+      <div class="quick" id="quick">
+        <button data-q="👍">👍</button>
+        <button data-q="☕ Chai?">☕ Chai?</button>
+        <button data-q="🍽️ Lunch?">🍽️ Lunch?</button>
+        <button data-q="🔍 Code review please">🔍 Review please</button>
+        <button data-q="📞 Call me when free">📞 Call me</button>
+        <button data-q="🎉 Great job!">🎉 Great job!</button>
+      </div>
+      <form class="composer" id="composer">
+        <textarea id="text" rows="2" maxlength="500" placeholder="Type a message… (Enter to send, Shift+Enter for a new line)"></textarea>
+        <button class="primary" id="send" type="submit">Send</button>
+      </form>
+      <p class="error-text pad" id="error"></p>
+    </section>
+  </div>
+  <script src="species.js"></script>
+  <script src="accessories.js"></script>
+  <script src="pet-svg.js"></script>
+  <script src="chat.js"></script>
+</body>
+</html>

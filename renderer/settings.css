@@ -206,6 +206,7 @@ h3 { font-size: 13.5px; margin: 14px 0 6px; }
 .empty { color: var(--muted); text-align: center; padding: 16px; }
 
 .team-mode { margin: 12px 0; }
+.chat-btn { margin-left: 8px; padding: 1px 7px; font-size: 12px; border-radius: 99px; vertical-align: middle; }
 .neighbors { margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--line); }
 .neighbors h3 { margin-top: 0; }
 #mode-cloud, #mode-folder { display: grid; gap: 10px; }
